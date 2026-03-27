@@ -143,23 +143,20 @@ input[type=number]:focus{border-color:var(--pri)}
     <!-- 考生 -->
     <div class="tp-panel on" id="tab0">
       <div style="margin-bottom:14px;padding:10px 14px;background:#eff6ff;border-radius:8px;font-size:12px;color:#2563eb">
-        📌 <b>首次使用：</b>请管理员导出考试数据后，点击下方 <b>导入数据</b> 按钮加载
+        📌 <b>首次使用：</b>请管理员导出考试数据后，点击下方 <b>导入数据</b> 按钮加载；账号密码请向管理员索取
       </div>
-      <div class="fg"><label>考生账号 / 学号</label><input id="l-sid" value="student001" placeholder="请输入考生账号"></div>
-      <div class="fg"><label>密码</label><input id="l-spass" type="password" value="123456" placeholder="请输入密码"></div>
+      <div class="fg"><label>考生账号 / 学号</label><input id="l-sid" placeholder="请输入考生账号"></div>
+      <div class="fg"><label>密码</label><input id="l-spass" type="password" placeholder="请输入密码"></div>
       <label class="btn btn-sec btn-sm" style="width:100%;text-align:center;margin-bottom:12px;cursor:pointer;display:block">📥 导入考试数据（从管理员处获取的JSON文件）<input type="file" accept=".json" style="display:none" onchange="importDataFile(event)"></label>
       <div class="fg"><label>选择考试场次</label>
-        <select id="l-exam">
-          <option value="1">2026年春季期末考试 · 计算机基础 (90分钟)</option>
-          <option value="2">模拟练习场次 (60分钟)</option>
-        </select>
+        <select id="l-exam"></select>
       </div>
       <button class="btn btn-pri" onclick="loginStudent()">🚀 进入考试</button>
     </div>
     <!-- 管理员 -->
     <div class="tp-panel" id="tab1">
-      <div class="fg"><label>管理员账号</label><input id="l-aid" value="admin" placeholder="admin"></div>
-      <div class="fg"><label>密码</label><input id="l-apass" type="password" value="admin123" placeholder="admin123"></div>
+      <div class="fg"><label>管理员账号</label><input id="l-aid" placeholder="请输入管理员账号"></div>
+      <div class="fg"><label>密码</label><input id="l-apass" type="password" placeholder="请输入密码"></div>
       <button class="btn btn-pri" onclick="loginAdmin()">🔑 进入管理后台</button>
     </div>
   </div>
@@ -225,15 +222,25 @@ input[type=number]:focus{border-color:var(--pri)}
             <button class="btn btn-sec btn-sm" onclick="openAddQ()">➕ 手动添加</button>
           </div>
         </div>
-        <div class="tip-box"><span style="font-size:18px">💡</span><div><div class="fw7 mb2">Word导入格式说明</div><div class="fs13 fc-muted">每道题用空行分隔。<br><b>选择题：</b>【选择题】题目内容\nA.选项\nB.选项\nC.选项\nD.选项\n答案:A\n分值:2<br><b>填空题：</b>【填空题】题目（___为空格）\n答案:答案1,答案2\n分值:3<br><b>简答题：</b>【简答题】题目\n参考答案:答案内容\n得分点:词1,词2,词3\n分值:10</div></div></div>
-        <div class="flex gap2 mb3" style="flex-wrap:wrap">
-          <button class="btn btn-sec btn-sm" id="qf-all" onclick="filterQ('all')">全部</button>
-          <button class="btn btn-sec btn-sm" id="qf-choice" onclick="filterQ('choice')">选择题</button>
-          <button class="btn btn-sec btn-sm" id="qf-fill" onclick="filterQ('fill')">填空题</button>
-          <button class="btn btn-sec btn-sm" id="qf-essay" onclick="filterQ('essay')">简答题</button>
+        <div class="tip-box"><span style="font-size:18px">💡</span><div><div class="fw7 mb2">Word导入格式说明</div><div class="fs13 fc-muted"><b>每道题之间用空行分隔。</b><br>
+<b>选择题：</b>【选择题】题目内容\nA.选项\nB.选项\nC.选项\nD.选项\n答案:__X__（单选）或 答案:__X, Y__（多选，用英文逗号）\n分值:2<br>
+<b>填空题：</b>【填空题】题目内容\n答案:答案1，答案2（多空用中文逗号分隔）\n分值:3<br>
+<b>简答题：</b>【简答题】题目内容\n参考答案:答案内容\n得分点:词1,词2,词3（逗号分隔）<br>
+<b>注意：</b>多选题答案为多个字母，如 <code>答案:__A, C, D__</code></div></div></div>
+        <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <label style="font-size:13px;color:var(--muted);white-space:nowrap">按考试筛选：</label>
+          <select id="qf-exam" onchange="renderQBank()" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;min-width:200px">
+            <option value="all">全部考试</option>
+          </select>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sec btn-sm" id="qf-all" onclick="filterQ('all')">全部</button>
+            <button class="btn btn-sec btn-sm" id="qf-choice" onclick="filterQ('choice')">选择题</button>
+            <button class="btn btn-sec btn-sm" id="qf-fill" onclick="filterQ('fill')">填空题</button>
+            <button class="btn btn-sec btn-sm" id="qf-essay" onclick="filterQ('essay')">简答题</button>
+          </div>
         </div>
         <div class="tbl-wrap"><table>
-          <thead><tr><th>#</th><th>类型</th><th>题目内容</th><th>分值</th><th>操作</th></tr></thead>
+          <thead><tr><th>#</th><th>所属考试</th><th>类型</th><th>题目内容</th><th>分值</th><th>操作</th></tr></thead>
           <tbody id="t-qbank"></tbody>
         </table>
         <div id="no-q" style="text-align:center;padding:36px;color:var(--muted)">暂无题目，请导入或手动添加</div>
@@ -341,14 +348,17 @@ input[type=number]:focus{border-color:var(--pri)}
   <div class="modal modal-lg">
     <div class="modal-hd"><h3>📄 导入 Word 题目</h3><button class="modal-close" onclick="closeM('m-import')">✕</button></div>
     <div class="modal-bd">
+      <div class="fg"><label>将题目导入到 <span style="color:var(--err)">*</span></label>
+        <select id="imp-exam"><option value="">请先选择目标考试</option></select>
+      </div>
       <div class="tip-box">
         <span style="font-size:18px">📋</span>
         <div class="fs13">
           <div class="fw7 mb2">支持格式（Word内容复制粘贴 或 上传.txt文件）</div>
           <div class="fc-muted">
-            <b>选择题：</b>【选择题】题目\nA.选项A\nB.选项B\nC.选项C\nD.选项D\n答案:A\n分值:2<br>
-            <b>填空题：</b>【填空题】题目（___为空白）\n答案:答案1,答案2\n分值:3<br>
-            <b>简答题：</b>【简答题】题目\n参考答案:完整答案\n得分点:关键词1,关键词2\n分值:10
+            <b>选择题：</b>【选择题】题目内容\nA.选项A\nB.选项B\nC.选项C\nD.选项D\n答案:__X__（单选）或 答案:__X, Y__（多选，逗号分隔）\n分值:2<br>
+            <b>填空题：</b>【填空题】题目内容\n答案:答案1，答案2（多空用中文逗号）\n分值:3<br>
+            <b>简答题：</b>【简答题】题目内容\n参考答案:完整答案\n得分点:关键词1,关键词2\n分值:10
           </div>
         </div>
       </div>
@@ -376,6 +386,9 @@ input[type=number]:focus{border-color:var(--pri)}
   <div class="modal">
     <div class="modal-hd"><h3 id="addq-title">➕ 添加题目</h3><button class="modal-close" onclick="closeM('m-addq')">✕</button></div>
     <div class="modal-bd">
+      <div class="fg"><label>所属考试 <span style="color:var(--err)">*</span></label>
+        <select id="q-exam" required><option value="">请选择所属考试</option></select>
+      </div>
       <div class="fg"><label>题目类型</label>
         <select id="q-type" onchange="refreshQForm()">
           <option value="choice">选择题</option>
@@ -414,25 +427,35 @@ input[type=number]:focus{border-color:var(--pri)}
 
 <!-- 创建/编辑考试 -->
 <div class="overlay hide" id="m-exam">
-  <div class="modal">
-    <div class="modal-hd"><h3>📋 创建考试</h3><button class="modal-close" onclick="closeM('m-exam')">✕</button></div>
+  <div class="modal" style="width:760px">
+    <div class="modal-hd"><h3 id="e-modal-title">📋 创建考试</h3><button class="modal-close" onclick="closeM('m-exam')">✕</button></div>
     <div class="modal-bd">
-      <div class="fg"><label>考试名称</label><input id="e-name" placeholder="如：2026年春季期末考试"></div>
-      <div class="fg"><label>科目</label><input id="e-sub" placeholder="如：计算机基础"></div>
-      <div class="fg"><label>考试时长（分钟）</label><input type="number" id="e-dur" value="90" min="10" max="480" style="width:100%"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="fg"><label>考试名称 <span style="color:var(--err)">*</span></label><input id="e-name" placeholder="如：2026年春季期末考试"></div>
+        <div class="fg"><label>科目</label><input id="e-sub" placeholder="如：计算机基础"></div>
+        <div class="fg"><label>考试开始时间</label><input type="datetime-local" id="e-start"></div>
+        <div class="fg"><label>考试结束时间</label><input type="datetime-local" id="e-end"></div>
+        <div class="fg"><label>考试时长（分钟）</label><input type="number" id="e-dur" value="90" min="10" max="480"></div>
+      </div>
+      <!-- 考生选择 -->
+      <div class="fg" style="margin-top:4px">
+        <label style="font-weight:700;margin-bottom:10px;display:block">👥 参考考生（勾选允许参加本次考试的账号）</label>
+        <div id="e-student-list" style="max-height:160px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;padding:8px 12px;background:#f8fafc"></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted)">未选则默认全部考生可参加；如无考生请先到「考生管理」添加</div>
+      </div>
       <div class="fg">
         <label style="font-weight:700;margin-bottom:10px;display:block">🛡️ 防作弊设置</label>
-        <div class="flex gap3" style="flex-direction:column">
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="e-rec" checked style="width:16px;height:16px"> 开启屏幕录制</label>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="e-cam" checked style="width:16px;height:16px"> 开启摄像头监控</label>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="e-tab" checked style="width:16px;height:16px"> 防止切换窗口/标签页</label>
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="e-fs" checked style="width:16px;height:16px"> 强制全屏模式</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 10px;background:#f8fafc;border-radius:6px"><input type="checkbox" id="e-rec" checked style="width:15px;height:15px"> 开启屏幕录制</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 10px;background:#f8fafc;border-radius:6px"><input type="checkbox" id="e-cam" checked style="width:15px;height:15px"> 开启摄像头监控</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 10px;background:#f8fafc;border-radius:6px"><input type="checkbox" id="e-tab" checked style="width:15px;height:15px"> 防止切换窗口/标签页</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 10px;background:#f8fafc;border-radius:6px"><input type="checkbox" id="e-fs" checked style="width:15px;height:15px"> 强制全屏模式</label>
         </div>
       </div>
     </div>
     <div class="modal-ft">
       <button class="btn btn-sec" onclick="closeM('m-exam')">取消</button>
-      <button class="btn btn-pri" onclick="saveExam()">保存</button>
+      <button class="btn btn-pri" onclick="saveExam()">💾 保存考试</button>
     </div>
   </div>
 </div>
@@ -540,6 +563,8 @@ let S = {
 // =====================================================
 document.addEventListener('DOMContentLoaded', ()=>{
   refreshStats();
+  refreshLoginExamList();
+  refreshQExamFilters();
   // 文件上传
   document.getElementById('imp-file').addEventListener('change', async function(){
     const f = this.files[0];
@@ -566,28 +591,65 @@ document.addEventListener('DOMContentLoaded', ()=>{
 function switchTab(i){
   document.querySelectorAll('.ltab').forEach((t,j)=>t.classList.toggle('on',j===i));
   document.querySelectorAll('#pg-login .tp-panel').forEach((p,j)=>p.classList.toggle('on',j===i));
+  if(i===0) refreshLoginExamList();
+}
+
+function refreshLoginExamList(){
+  const sel=document.getElementById('l-exam');
+  if(!sel) return;
+  const exams=getExamList();
+  if(exams.length===0){
+    sel.innerHTML='<option value="">暂无考试</option>';
+    return;
+  }
+  sel.innerHTML=exams.map(e=>`<option value="${e.id}">${esc(e.name)} (${e.duration}分钟)</option>`).join('');
+}
+
+function refreshQExamFilters(){
+  const sel=document.getElementById('qf-exam');
+  if(!sel) return;
+  const exams=getExamList();
+  sel.innerHTML='<option value="all">全部考试</option>'+
+    exams.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
 }
 
 function loginStudent(){
-  const sid = v('l-sid'), spass = v('l-spass'), eid = parseInt(v('l-exam'));
+  const sid = v('l-sid').trim(), spass = v('l-spass').trim();
+  if(!sid){toast('请输入账号','err');return;}
+  if(!spass){toast('请输入密码','err');return;}
   const stu = DB.students.find(s=>s.id===sid && s.pass===spass);
   if(!stu){ toast('账号或密码错误！','err'); return; }
   S.role='examinee'; S.user=stu;
-  // 考试配置（简化为根据选项生成）
-  S.exam = {
-    id: eid,
-    name: eid===1?'2026年春季期末考试 · 计算机基础':'模拟练习场次',
-    duration: eid===1?90:60,
-    antiCheat:{rec:true,cam:true,tab:true,fs:true}
+  const eid=parseInt(v('l-exam'));
+  const exam=getExamList().find(e=>e.id===eid);
+  if(!exam){toast('请选择考试场次','err');return;}
+  // 检查时间限制
+  const now=new Date();
+  if(exam.endTime && now>new Date(exam.endTime)){toast('该考试已结束','err');return;}
+  if(exam.startTime && now<new Date(exam.startTime)){toast('该考试尚未开始，请于 '+exam.startTime+' 后再试','warn');return;}
+  // 检查是否在参考名单中
+  if(exam.studentIds && exam.studentIds.length>0 && !exam.studentIds.includes(sid)){
+    toast('您未被授权参加此考试，请联系管理员','err');return;
+  }
+  S.exam={
+    id:exam.id,
+    name:exam.name,
+    duration:exam.duration||60,
+    antiCheat:exam.anti||{rec:true,cam:true,tab:true,fs:true},
+    examData:exam
   };
   openM('m-notice');
   reqCamera();
 }
 
 function loginAdmin(){
-  if(v('l-aid')==='admin' && v('l-apass')==='admin123'){
+  const aid=v('l-aid').trim(), apass=v('l-apass').trim();
+  if(!aid){toast('请输入管理员账号','err');return;}
+  if(!apass){toast('请输入密码','err');return;}
+  if(aid==='admin' && apass==='admin123'){
     S.role='admin'; S.user={id:'admin',name:'管理员'};
     showPage('pg-admin');
+    refreshLoginExamList(); refreshQExamFilters();
     refreshStats(); renderExamsHome(); renderQBank(); renderExamsTab(); renderStus();
   } else {
     toast('账号或密码错误！','err');
@@ -999,10 +1061,11 @@ function goTab(tab){
   document.querySelectorAll('#pg-admin .tp-panel').forEach(p=>p.classList.remove('on'));
   document.getElementById('nav-'+tab).classList.add('on');
   document.getElementById('tab-'+tab).classList.add('on');
-  if(tab==='qbank') renderQBank();
+  if(tab==='qbank'){refreshQExamFilters();renderQBank();}
   if(tab==='exams') renderExamsTab();
   if(tab==='stus') renderStus();
   if(tab==='grade') renderGradeTab();
+  if(tab==='home'){refreshLoginExamList();renderExamsHome();refreshStats();}
 }
 
 // =====================================================
@@ -1020,27 +1083,35 @@ function filterQ(type){
 
 function renderQBank(){
   const qs=DB.questions;
-  const filtered=qFilter==='all'?qs:qs.filter(q=>q.type===qFilter);
   const tbody=document.getElementById('t-qbank');
   const noQ=document.getElementById('no-q');
   if(!tbody) return;
-  if(filtered.length===0){tbody.innerHTML='';noQ.style.display='block';refreshStats();return;}
-  noQ.style.display='none';
+  const examFilter=document.getElementById('qf-exam')?.value||'all';
+  let filtered=qs;
+  if(examFilter!=='all') filtered=filtered.filter(q=>String(q.examId)===String(examFilter));
+  if(qFilter!=='all') filtered=filtered.filter(q=>q.type===qFilter);
+  if(filtered.length===0){tbody.innerHTML='';if(noQ) noQ.style.display='block';refreshStats();return;}
+  if(noQ) noQ.style.display='none';
   const tl={choice:'<span class="badge b-blue">选择题</span>',fill:'<span class="badge b-green">填空题</span>',essay:'<span class="badge b-yellow">简答题</span>'};
-  tbody.innerHTML=filtered.map((q,i)=>`<tr>
+  const exams=getExamList();
+  tbody.innerHTML=filtered.map((q,i)=>{
+    const examName=exams.find(e=>String(e.id)===String(q.examId))?.name||'未指定';
+    return `<tr>
     <td class="fc-muted">${i+1}</td>
+    <td><div style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(examName)}">${esc(examName)}</div></td>
     <td>${tl[q.type]||q.type}</td>
-    <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(q.content)}">${esc(q.content)}</td>
+    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(q.content)}">${esc(q.content)}</td>
     <td>${q.score}分</td>
     <td><div class="flex gap2">
       <button class="btn btn-sec btn-sm" onclick="editQ(${q.id})">编辑</button>
       <button class="btn btn-err btn-sm" onclick="delQ(${q.id})">删除</button>
     </div></td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
   refreshStats();
 }
 
-function openAddQ(){
+function openAddQ(examId){
   S.editQId=null;
   document.getElementById('addq-title').textContent='➕ 添加题目';
   document.getElementById('q-type').value='choice';
@@ -1048,6 +1119,13 @@ function openAddQ(){
   document.getElementById('q-score').value='5';
   document.getElementById('q-ans').value='A';
   refreshQForm();
+  // 填充考试下拉
+  const sel=document.getElementById('q-exam');
+  if(sel){
+    const exams=getExamList();
+    sel.innerHTML='<option value="">请选择所属考试</option>'+
+      exams.map(e=>`<option value="${e.id}" ${String(examId||'')===String(e.id)?'selected':''}>${esc(e.name)}</option>`).join('');
+  }
   openM('m-addq');
 }
 
@@ -1058,18 +1136,25 @@ function editQ(id){
   document.getElementById('addq-title').textContent='✏️ 编辑题目';
   document.getElementById('q-type').value=q.type;
   document.getElementById('q-content').value=q.content;
-  document.getElementById('q-score').value=q.score;
+  document.getElementById('q-score').value=q.score||5;
   if(q.type==='choice'){
     document.getElementById('q-a').value=q.opts?.A||'';
     document.getElementById('q-b').value=q.opts?.B||'';
     document.getElementById('q-c').value=q.opts?.C||'';
     document.getElementById('q-d').value=q.opts?.D||'';
-    document.getElementById('q-ans').value=q.answer||'A';
+    document.getElementById('q-ans').value=(q.answer||'A').toString().charAt(0);
   } else if(q.type==='fill'){
     document.getElementById('q-fill-ans').value=Array.isArray(q.answer)?q.answer.join(','):q.answer||'';
   } else {
     document.getElementById('q-ref').value=q.refAns||'';
     document.getElementById('q-kw').value=q.keywords||'';
+  }
+  // 填充考试下拉
+  const sel=document.getElementById('q-exam');
+  if(sel){
+    const exams=getExamList();
+    sel.innerHTML='<option value="">请选择所属考试</option>'+
+      exams.map(e=>`<option value="${e.id}" ${String(q.examId||'')===String(e.id)?'selected':''}>${esc(e.name)}</option>`).join('');
   }
   refreshQForm();
   openM('m-addq');
@@ -1085,8 +1170,10 @@ function refreshQForm(){
 function saveQ(){
   const type=v('q-type'), content=v('q-content').trim();
   if(!content){toast('请输入题目内容','err');return;}
+  const examId=parseInt(v('q-exam'))||null;
+  if(!examId){toast('请选择题目所属考试','err');return;}
   const score=parseInt(v('q-score'))||5;
-  let q={type,content,score};
+  let q={type,content,score,examId};
   if(type==='choice'){
     const A=v('q-a').trim(),B=v('q-b').trim();
     if(!A||!B){toast('请至少填写A、B选项','err');return;}
@@ -1112,7 +1199,7 @@ function saveQ(){
   DB.questions=qs;
   closeM('m-addq');
   renderQBank();
-  toast(S.editQId?'题目已更新！':'题目已添加！','ok');
+  toast(S.editQId?'✅ 题目已更新！':'✅ 题目已添加！','ok');
 }
 
 function delQ(id){
@@ -1131,6 +1218,13 @@ function openImport(){
   document.getElementById('imp-preview').style.display='none';
   document.getElementById('btn-imp-ok').classList.add('hide');
   S.parsedQs=[];
+  // 填充考试下拉
+  const sel=document.getElementById('imp-exam');
+  if(sel){
+    const exams=getExamList();
+    sel.innerHTML='<option value="">请选择目标考试</option>'+
+      exams.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+  }
   openM('m-import');
 }
 
@@ -1158,75 +1252,104 @@ function doParse(){
 
 function parseTxt(txt){
   const result=[];
-  const blocks=txt.split(/\n{2,}|(?=【(?:选择题|填空题|简答题)】)/);
-  blocks.forEach(blk=>{
-    blk=blk.trim();
-    if(!blk) return;
-    const lines=blk.split('\n').map(l=>l.trim()).filter(Boolean);
-    if(!lines.length) return;
-    const h=lines[0];
-    let type='';
-    if(h.includes('【选择题】')) type='choice';
-    else if(h.includes('【填空题】')) type='fill';
-    else if(h.includes('【简答题】')) type='essay';
-    else return;
-    const content=h.replace(/【(选择题|填空题|简答题)】/,'').trim();
-    if(!content) return;
-    let q={type,content,score:5};
-    if(type==='choice'){
-      q.opts={};
-      lines.slice(1).forEach(l=>{
-        if(/^A[.．、]/i.test(l)) q.opts.A=l.replace(/^A[.．、]/i,'').trim();
-        else if(/^B[.．、]/i.test(l)) q.opts.B=l.replace(/^B[.．、]/i,'').trim();
-        else if(/^C[.．、]/i.test(l)) q.opts.C=l.replace(/^C[.．、]/i,'').trim();
-        else if(/^D[.．、]/i.test(l)) q.opts.D=l.replace(/^D[.．、]/i,'').trim();
-        else if(/^答案[：:]/.test(l)) q.answer=l.replace(/^答案[：:]/,'').trim().toUpperCase();
-        else if(/^分值[：:]/.test(l)) q.score=parseInt(l.replace(/^分值[：:]/,''))||5;
-      });
-    } else if(type==='fill'){
-      lines.slice(1).forEach(l=>{
-        if(/^答案[：:]/.test(l)) q.answer=l.replace(/^答案[：:]/,'').trim();
-        else if(/^分值[：:]/.test(l)) q.score=parseInt(l.replace(/^分值[：:]/,''))||5;
-      });
-    } else {
-      lines.slice(1).forEach(l=>{
-        if(/^参考答案[：:]/.test(l)) q.refAns=l.replace(/^参考答案[：:]/,'').trim();
-        else if(/^得分点[：:]/.test(l)) q.keywords=l.replace(/^得分点[：:]/,'').trim();
-        else if(/^分值[：:]/.test(l)) q.score=parseInt(l.replace(/^分值[：:]/,''))||5;
-      });
-    }
-    result.push(q);
+  // 先按【选择题】【填空题】【简答题】分段
+  const sections=txt.split(/(?=【(?:选择题|填空题|简答题)】)/).filter(Boolean);
+  sections.forEach(sec=>{
+    const blocks=sec.split(/\n{2,}/).filter(Boolean);
+    blocks.forEach(blk=>{
+      blk=blk.trim();
+      if(!blk) return;
+      const lines=blk.split('\n').map(l=>l.trim()).filter(Boolean);
+      if(!lines.length) return;
+      const h=lines[0];
+      let type='';
+      if(h.includes('【选择题】')) type='choice';
+      else if(h.includes('【填空题】')) type='fill';
+      else if(h.includes('【简答题】')||h.includes('【问答题】')||h.includes('【综合问答题】')) type='essay';
+      else return;
+      const content=h.replace(/【(?:选择题|填空题|简答题|问答题|综合问答题)】/,'').trim();
+      if(!content) return;
+      let q={type,content,score:5};
+      // 在整个blk中搜索答案（处理答案与题目内容同行的格式）
+      if(type==='choice'){
+        q.opts={};
+        // 提取答案：支持 __A__ 、 _B___ 、 __A, C, D__ 等格式
+        const ansMatch=blk.match(/答案[：:]\s*__([A-Z](?:\s*,\s*[A-Z])*)__/);
+        if(ansMatch) q.answer=ansMatch[1].replace(/\s/g,'').toUpperCase();
+        // 提取选项
+        lines.slice(1).forEach(l=>{
+          if(/^A[.．、:\s]/.test(l)) q.opts.A=l.replace(/^A[.．、:\s]*/,'').trim();
+          else if(/^B[.．、:\s]/.test(l)) q.opts.B=l.replace(/^B[.．、:\s]*/,'').trim();
+          else if(/^C[.．、:\s]/.test(l)) q.opts.C=l.replace(/^C[.．、:\s]*/,'').trim();
+          else if(/^D[.．、:\s]/.test(l)) q.opts.D=l.replace(/^D[.．、:\s]*/,'').trim();
+          else if(/^分值[：:]/.test(l)) q.score=parseInt(l.replace(/^分值[：:]/,''))||5;
+        });
+      } else if(type==='fill'){
+        lines.slice(1).forEach(l=>{
+          if(/^答案[：:]/.test(l)) q.answer=l.replace(/^答案[：:]/,'').trim();
+          else if(/^分值[：:]/.test(l)) q.score=parseInt(l.replace(/^分值[：:]/,''))||5;
+        });
+      } else {
+        lines.slice(1).forEach(l=>{
+          if(/^参考答案[：:]/.test(l)) q.refAns=l.replace(/^参考答案[：:]/,'').trim();
+          else if(/^得分点[：:]/.test(l)) q.keywords=l.replace(/^得分点[：:]/,'').trim();
+          else if(/^分值[：:]/.test(l)) q.score=parseInt(l.replace(/^分值[：:]/,''))||5;
+        });
+      }
+      result.push(q);
+    });
   });
   return result;
 }
 
 function doImport(){
   if(!S.parsedQs.length) return;
+  const examId=parseInt(v('imp-exam'))||null;
+  if(!examId){toast('请先选择题目要导入的考试','err');return;}
   const qs=DB.questions;
   let maxId=qs.length?Math.max(...qs.map(q=>q.id)):0;
-  S.parsedQs.forEach((q,i)=>{q.id=maxId+i+1;});
+  S.parsedQs.forEach((q,i)=>{q.id=maxId+i+1;q.examId=examId;});
   DB.questions=[...qs,...S.parsedQs];
   closeM('m-import');
   renderQBank();
-  toast(`✅ 成功导入 ${S.parsedQs.length} 道题目！`,'ok');
+  toast(`✅ 成功导入 ${S.parsedQs.length} 道题目到所选考试！`,'ok');
   S.parsedQs=[];
 }
 
 // =====================================================
-//  考试管理
+//  考试管理（持久化）
 // =====================================================
-const EXAM_LIST=[
-  {id:1,name:'2026年春季期末考试 · 计算机基础',sub:'计算机基础',duration:90,status:'active',anti:{rec:true,cam:true,tab:true,fs:true}},
-  {id:2,name:'模拟练习场次',sub:'综合',duration:60,status:'pending',anti:{rec:false,cam:true,tab:true,fs:false}},
-];
+const EXAM_LIST={
+  data: [
+    {id:1,name:'2026年春季期末考试 · 计算机基础',sub:'计算机基础',duration:90,startTime:'',endTime:'',studentIds:[],anti:{rec:true,cam:true,tab:true,fs:true}},
+    {id:2,name:'模拟练习场次',sub:'综合',duration:60,startTime:'',endTime:'',studentIds:[],anti:{rec:false,cam:true,tab:true,fs:false}},
+  ],
+  get list(){ return JSON.parse(localStorage.getItem('exams')||'null')||this.data; },
+  set list(v){ localStorage.setItem('exams',JSON.stringify(v)); },
+  refresh(){ this.list = this.list; }
+};
+// 兼容旧代码：EXAM_LIST.map 等于 EXAM_LIST.list.map
+Object.defineProperty(EXAM_LIST,'map',{get:function(){return this.list.map.bind(this.list);}});
+Object.defineProperty(EXAM_LIST,'find',{get:function(){return this.list.find.bind(this.list);}});
+Object.defineProperty(EXAM_LIST,'filter',{get:function(){return this.list.filter.bind(this.list);}});
+
+function getExamList(){ return EXAM_LIST.list; }
+
+function getExamStatus(exam){
+  if(!exam.startTime && !exam.endTime) return 'pending';
+  const now=new Date();
+  if(exam.endTime && now>new Date(exam.endTime)) return 'ended';
+  if(exam.startTime && now>=new Date(exam.startTime)) return 'active';
+  return 'pending';
+}
 
 function renderExamsHome(){
   const tbody=document.getElementById('t-exams-home');
   if(!tbody) return;
   const statusBadge={active:'<span class="badge b-green">进行中</span>',pending:'<span class="badge b-gray">未开始</span>',ended:'<span class="badge b-red">已结束</span>'};
-  tbody.innerHTML=EXAM_LIST.map(e=>`<tr>
+  tbody.innerHTML=getExamList().map(e=>`<tr>
     <td class="fw7">${esc(e.name)}</td><td>${e.duration}分钟</td>
-    <td>${statusBadge[e.status]||''}</td>
+    <td>${statusBadge[getExamStatus(e)]||''}</td>
     <td><button class="btn btn-sec btn-sm" onclick="goTab('grade')">查看成绩</button></td>
   </tr>`).join('');
 }
@@ -1235,11 +1358,13 @@ function renderExamsTab(){
   const tbody=document.getElementById('t-exams');
   if(!tbody) return;
   const statusBadge={active:'<span class="badge b-green">进行中</span>',pending:'<span class="badge b-gray">未开始</span>',ended:'<span class="badge b-red">已结束</span>'};
-  tbody.innerHTML=EXAM_LIST.map(e=>`<tr>
-    <td><div class="fw7">${esc(e.name)}</div><div class="fs13 fc-muted">${esc(e.sub)}</div></td>
+  tbody.innerHTML=getExamList().map(e=>`<tr>
+    <td><div class="fw7">${esc(e.name)}</div><div class="fs13 fc-muted">${esc(e.sub||'')}</div>
+      ${e.startTime?'<div class="fs13 fc-muted">⏰ '+esc(e.startTime)+' ~ '+esc(e.endTime||'不限')+'</div>':''}
+    </td>
     <td>${e.duration}分钟</td>
-    <td><span class="badge b-green">${Object.values(e.anti).filter(Boolean).length}/4项开启</span></td>
-    <td>${statusBadge[e.status]||''}</td>
+    <td><span class="badge b-green">${Object.values(e.anti||{}).filter(Boolean).length}/4项</span></td>
+    <td>${statusBadge[getExamStatus(e)]||''}</td>
     <td><div class="flex gap2">
       <button class="btn btn-sec btn-sm" onclick="openCreateExam(${e.id})">编辑</button>
       <button class="btn btn-err btn-sm" onclick="delExam(${e.id})">删除</button>
@@ -1249,21 +1374,36 @@ function renderExamsTab(){
 
 function openCreateExam(id){
   S.editExamId=id||null;
+  document.getElementById('e-modal-title').textContent=id?'📋 编辑考试':'📋 创建考试';
+  // 渲染考生列表
+  const list=document.getElementById('e-student-list');
+  const exams=getExamList();
+  list.innerHTML=DB.students.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee">
+    <input type="checkbox" class="e-stu-cb" value="${esc(s.id)}" style="width:15px;height:15px"> ${esc(s.id)} · ${esc(s.name)}
+  </label>`).join('');
   if(id){
-    const e=EXAM_LIST.find(x=>x.id===id);
+    const e=exams.find(x=>x.id===id);
     if(e){
-      document.getElementById('e-name').value=e.name;
-      document.getElementById('e-sub').value=e.sub;
-      document.getElementById('e-dur').value=e.duration;
-      document.getElementById('e-rec').checked=!!e.anti.rec;
-      document.getElementById('e-cam').checked=!!e.anti.cam;
-      document.getElementById('e-tab').checked=!!e.anti.tab;
-      document.getElementById('e-fs').checked=!!e.anti.fs;
+      document.getElementById('e-name').value=e.name||'';
+      document.getElementById('e-sub').value=e.sub||'';
+      document.getElementById('e-dur').value=e.duration||90;
+      document.getElementById('e-start').value=e.startTime||'';
+      document.getElementById('e-end').value=e.endTime||'';
+      document.getElementById('e-rec').checked=!!e.anti?.rec;
+      document.getElementById('e-cam').checked=!!e.anti?.cam;
+      document.getElementById('e-tab').checked=!!e.anti?.tab;
+      document.getElementById('e-fs').checked=!!e.anti?.fs;
+      // 回选考生
+      (e.studentIds||[]).forEach(sid=>{
+        const cb=list.querySelector(`[value="${sid}"]`);
+        if(cb) cb.checked=true;
+      });
     }
   } else {
-    ['e-name','e-sub'].forEach(x=>document.getElementById(x).value='');
+    ['e-name','e-sub','e-start','e-end'].forEach(x=>document.getElementById(x).value='');
     document.getElementById('e-dur').value='90';
     ['e-rec','e-cam','e-tab','e-fs'].forEach(x=>document.getElementById(x).checked=true);
+    list.querySelectorAll('.e-stu-cb').forEach(cb=>cb.checked=false);
   }
   openM('m-exam');
 }
@@ -1271,12 +1411,47 @@ function openCreateExam(id){
 function saveExam(){
   const name=v('e-name').trim();
   if(!name){toast('请输入考试名称','err');return;}
-  toast('考试信息已保存','ok');
+  const startTime=v('e-start');
+  const endTime=v('e-end');
+  const duration=parseInt(v('e-dur'))||90;
+  const studentIds=Array.from(document.querySelectorAll('.e-stu-cb:checked')).map(cb=>cb.value);
+  const exam={
+    id: S.editExamId||Date.now(),
+    name,
+    sub: v('e-sub').trim(),
+    duration,
+    startTime,
+    endTime,
+    studentIds,
+    anti:{
+      rec:!!document.getElementById('e-rec').checked,
+      cam:!!document.getElementById('e-cam').checked,
+      tab:!!document.getElementById('e-tab').checked,
+      fs:!!document.getElementById('e-fs').checked,
+    }
+  };
+  const list=getExamList();
+  if(S.editExamId){
+    const idx=list.findIndex(x=>x.id===S.editExamId);
+    if(idx>=0) list[idx]=exam;
+  } else {
+    list.push(exam);
+  }
+  EXAM_LIST.list=list;
   closeM('m-exam');
+  renderExamsTab();
+  renderExamsHome();
+  toast(S.editExamId?'✅ 考试已更新！':'✅ 考试已创建！','ok');
 }
 
 function delExam(id){
-  if(confirm('确认删除此考试场次？')) toast('已删除（演示）','ok');
+  if(!confirm('确认删除此考试场次？')) return;
+  let list=getExamList();
+  list=list.filter(x=>x.id!==id);
+  EXAM_LIST.list=list;
+  renderExamsTab();
+  renderExamsHome();
+  toast('已删除','ok');
 }
 
 // =====================================================
@@ -1289,12 +1464,16 @@ function renderStus(){
   tbody.innerHTML=DB.students.map(s=>{
     const sub=subs[s.id];
     const status=sub?'<span class="badge b-blue">已交卷</span>':'<span class="badge b-gray">未开始</span>';
-    const exam=EXAM_LIST.find(e=>e.id===s.examId);
+    const examId=s.examId?String(s.examId):'';
+    const exam=examId?getExamList().find(e=>String(e.id)===examId):null;
     return `<tr>
       <td>${esc(s.id)}</td><td>${esc(s.name)}</td>
       <td>${exam?esc(exam.name):'—'}</td>
       <td>${status}</td>
-      <td><button class="btn btn-sec btn-sm" onclick="viewStu('${s.id}')">查看</button></td>
+      <td><div class="flex gap1">
+        <button class="btn btn-sec btn-sm" onclick="resetPwd('${esc(s.id)}')" title="重置密码为123456">🔑</button>
+        <button class="btn btn-sec btn-sm" onclick="delStudent('${esc(s.id)}')" title="删除">🗑</button>
+      </div></td>
     </tr>`;
   }).join('');
 }
@@ -1302,20 +1481,29 @@ function renderStus(){
 function addStu(){
   const name=prompt('请输入考生姓名：'); if(!name) return;
   const id=prompt('请输入学号/账号：'); if(!id) return;
+  if(DB.students.find(s=>s.id===id)){ toast('该账号已存在！','err'); return; }
   const stus=DB.students;
-  stus.push({id,name,pass:'123456',examId:1});
+  stus.push({id,name,pass:'123456'});
   DB.students=stus;
   renderStus();
   refreshStats();
-  toast(`✅ 添加成功！账号：${id}，默认密码：123456`,'ok');
+  toast('✅ 添加成功！账号：'+id+'，默认密码：123456','ok');
 }
 
-function viewStu(id){
-  const subs=DB.submissions;
-  const sub=subs[id];
-  const stu=DB.students.find(s=>s.id===id);
-  if(!sub){toast((stu?.name||id)+'暂未交卷','warn');return;}
-  alert(`考生：${sub.stu.name}\n提交时间：${sub.submitAt}\n选择题：${sub.choiceScore}分\n切屏次数：${sub.tabCnt}次`);
+function resetPwd(id){
+  if(!confirm('确认将 '+id+' 的密码重置为 123456 ？')) return;
+  const stus=DB.students;
+  const idx=stus.findIndex(s=>s.id===id);
+  if(idx>=0){ stus[idx].pass='123456'; DB.students=stus; }
+  toast('✅ 密码已重置为 123456','ok');
+}
+
+function delStudent(id){
+  if(!confirm('确认删除考生 '+id+' ？此操作不可恢复！')) return;
+  DB.students=DB.students.filter(s=>s.id!==id);
+  renderStus();
+  refreshStats();
+  toast('已删除','ok');
 }
 
 // =====================================================

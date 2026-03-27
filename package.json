@@ -1,14 +1,9 @@
-{
+﻿{
   "name": "exam-system",
   "version": "1.0.0",
-  "description": "在线考试监考系统",
-  "bin": "server.js",
+  "description": "exam monitoring system",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js"
-  },
-  "pkg": {
-    "scripts": ["server.js"],
-    "targets": ["node18-win-x64"],
-    "outputPath": "."
   }
 }
