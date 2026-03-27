@@ -1,0 +1,73 @@
+name: 构建与发布
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  # ── 任务1: 构建离线 exe ──────────────────────────────────────────
+  build-exe:
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: 安装 pkg
+        run: npm install -g pkg
+
+      - name: 下载 pkg 运行时包（绕过 GitHub 下载慢的问题）
+        run: |
+          npm install
+
+      - name: 打包为 Windows exe
+        run: |
+          npx pkg server.js --targets node18-win-x64 --output exam-system.exe
+          dir exam-system.exe
+
+      - name: 压缩 exe
+        run: |
+          mkdir dist
+          copy exam-system.exe dist\
+          powershell Compress-Archive -Path dist/exam-system.exe -DestinationPath exam-system-portable.zip -Force
+
+      - name: 上传 exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: exam-system-portable
+          path: exam-system-portable.zip
+          retention-days: 30
+
+  # ── 任务2: 部署到 GitHub Pages（永久公网访问） ─────────────────────
+  deploy-pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: 上传 GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'index.html'
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: 输出访问地址
+        run: echo "🎉 考试系统已发布到: ${{ steps.deployment.outputs.page_url }}"
