@@ -1,0 +1,24 @@
+{
+  "version": "1.1",
+  "type": "full-package",
+  "exportedAt": "2026-04-15T06:00:00.000Z",
+  "students": [
+    {
+      "id": "student001",
+      "name": "张三",
+      "pass": "123456",
+      "dept": "技术部"
+    },
+    {
+      "id": "student002",
+      "name": "李四",
+      "pass": "123456",
+      "dept": "市场部"
+    }
+  ],
+  "exams": [],
+  "questions": [],
+  "submissions": {},
+  "gradingRules": {},
+  "depts": ["技术部", "市场部"]
+}

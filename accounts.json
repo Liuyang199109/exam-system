@@ -1,0 +1,123 @@
+{
+  "version": "1.0",
+  "type": "accounts",
+  "exportedAt": "2026-04-15T07:20:05.157Z",
+  "students": [
+    {
+      "id": "student001",
+      "name": "张三",
+      "pass": "123456",
+      "examId": 1,
+      "dept": ""
+    },
+    {
+      "id": "student002",
+      "name": "李四",
+      "pass": "123456",
+      "examId": 1,
+      "dept": ""
+    },
+    {
+      "id": "laiph",
+      "name": "赖品欢",
+      "pass": "123456",
+      "dept": "人力资源部"
+    },
+    {
+      "id": "zhangl",
+      "name": "张琳",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "ces",
+      "name": "测试",
+      "pass": "123456",
+      "dept": ""
+    },
+    {
+      "id": "zhanght",
+      "name": "张宏涛",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "wanghl",
+      "name": "王华莉",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "yewq",
+      "name": "叶伟青",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "zhangxy",
+      "name": "张欣雨",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "huangqd",
+      "name": "黄庆达",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "xiaozr",
+      "name": "肖周锐",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "xiaox",
+      "name": "肖鑫",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "shensx",
+      "name": "沈帅先",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "lingm",
+      "name": "林广铭",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "wangj",
+      "name": "王健",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "zhaoqy",
+      "name": "赵庆宇",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "wangyq",
+      "name": "王英琪",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "dilxt",
+      "name": "迪力夏提",
+      "pass": "123456",
+      "dept": "BU2"
+    },
+    {
+      "id": "haungj",
+      "name": "黄静",
+      "pass": "123456",
+      "dept": "BU2"
+    }
+  ]
+}
