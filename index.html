@@ -1781,8 +1781,8 @@ function loginAdmin(){
 }
 
 function logout(){
-  stopMonitor();
-  clearInterval(S.timerH);
+  try{stopMonitor();}catch(e){}
+  try{clearInterval(S.timerH);}catch(e){}
   localStorage.removeItem('session');
   localStorage.removeItem('quickLogin');
   localStorage.removeItem('lastTab');
@@ -1797,9 +1797,10 @@ function logout(){
   // 静止检测
   inactivityH:null, lastActivity:0, inactivityCount:0,
 };
-  document.getElementById('monitor-bar').style.display='none';
-  document.getElementById('cam-wrap').style.display='none';
-  document.getElementById('cam-prev').style.display='none';
+  // 安全隐藏考试监控界面元素（这些元素可能不存在）
+  try{const mb=document.getElementById('monitor-bar');if(mb)mb.style.display='none';}catch(e){}
+  try{const cw=document.getElementById('cam-wrap');if(cw)cw.style.display='none';}catch(e){}
+  try{const cp=document.getElementById('cam-prev');if(cp)cp.style.display='none';}catch(e){}
   setText('adm-username','管理员');
   setText('adm-avatar','管');
   showPage('pg-login');
