@@ -1,7 +1,7 @@
 {
   "version": "1.1",
   "type": "full-package",
-  "exportedAt": "2026-04-15T16:18:22.227Z",
+  "exportedAt": "2026-04-15T16:32:46.191Z",
   "students": [
     {
       "id": "student001",
@@ -142,9 +142,9 @@
       "id": 1776080473520,
       "name": "2026年BU2第三次培训考试",
       "sub": "预处理算法选择",
-      "duration": 1860,
+      "duration": 420,
       "startTime": "2026-04-16T17:00",
-      "endTime": "2026-04-18T00:00",
+      "endTime": "2026-04-17T00:00",
       "studentIds": [
         "student001",
         "laiph",
