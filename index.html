@@ -1468,10 +1468,12 @@ async function autoLoadFullData(){
       const result = data ? _applyCloudData(data) : null;
       if(result === 'updated' || result === 'nochange' || result === 'stale'){
         _lastSyncSource = 'network';
+        // 无论数据是否有更新，都要渲染考试列表
+        // 否则考生端在 stale/nochange 状态下看不到最新考试
+        if(S.role==='examinee') renderStuExamList();
         if(result === 'updated'){
           updateLoadingUI(`✅ <b>考试数据已同步！</b>考试${(data.exams||[]).length}场 题目${(data.questions||[]).length}道 账号${(data.students||[]).length}人`, '#f0fdf4', '#16a34a');
           showSyncBanner(`🎉 数据已同步！`, 'ok');
-          if(S.role==='examinee') renderStuExamList();
           if(S.role==='admin'){ refreshStats(); renderQBank(); renderStus(); renderExamsHome(false); renderExamsTab(false); }
         } else {
           const t = localStorage.getItem('_lastSyncAt');
@@ -1838,18 +1840,15 @@ function logout(){
   localStorage.removeItem('session');
   localStorage.removeItem('quickLogin');
   localStorage.removeItem('lastTab');
-  S = {role:null,user:null,exam:null,ans:{},flags:new Set(),timerH:null,left:0,tabs:0,cheatLog:[],camStream:null,scrStream:null,scrRecorder:null,camRecorder:null,scrChunks:0,camChunks:0,scrChunksIdx:0,camChunksIdx:0,recStartTime:null,parsedQs:[],editQId:null,editExamId:null,gradingStu:null,
-    // 视频本地暂存（跨网络场景：上传失败时保存在内存，交卷时打包下载）
+  S = {
+    role:null,user:null,exam:null,ans:{},flags:new Set(),timerH:null,left:0,tabs:0,cheatLog:[],camStream:null,scrStream:null,scrRecorder:null,camRecorder:null,scrChunks:0,camChunks:0,scrChunksIdx:0,camChunksIdx:0,recStartTime:null,parsedQs:[],editQId:null,editExamId:null,gradingStu:null,
     scrLocalChunks:[], camLocalChunks:[], scrLocalOk:false, camLocalOk:false,
-    // 人脸/设备检测
     faceDetectH:null, faceCanvas:null, faceCtx:null, faceStatus:'ok',
     faceAlertCount:0, faceAlertTimes:0, faceAlertCooldown:0,
     deviceDetectH:null, devicePrevFrame:null, deviceAlertCount:0,
-  deviceAlertTimes:0, deviceAlertCooldown:0, deviceStableCount:0,
-  // 静止检测
-  inactivityH:null, lastActivity:0, inactivityCount:0,
-};
-  // 安全隐藏考试监控界面元素（这些元素可能不存在）
+    deviceAlertTimes:0, deviceAlertCooldown:0, deviceStableCount:0,
+    inactivityH:null, lastActivity:0, inactivityCount:0,
+  };
   try{const mb=document.getElementById('monitor-bar');if(mb)mb.style.display='none';}catch(e){}
   try{const cw=document.getElementById('cam-wrap');if(cw)cw.style.display='none';}catch(e){}
   try{const cp=document.getElementById('cam-prev');if(cp)cp.style.display='none';}catch(e){}
