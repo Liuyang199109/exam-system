@@ -576,7 +576,7 @@ D.选项
       <div class="lbl">客观题得分</div>
     </div>
     <div class="divider"></div>
-    <div id="res-detail" style="text-align:left;font-size:14px"></div>
+    <div id="res-detail" style="text-align:center;font-size:14px"></div>
     <div style="color:var(--muted);font-size:13px;margin-top:12px">填空题、简答题将由老师批改后公布最终成绩</div>
     <div style="display:flex;gap:10px;justify-content:center;margin-top:20px">
       <button class="btn btn-sec" style="flex:1" onclick="openChangePwd()">🔑 修改密码</button>
@@ -2461,7 +2461,7 @@ function doSubmit(){
   try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
 
   // 显示结果
-  document.getElementById('res-score').textContent=result.total+'（预估）';
+  document.getElementById('res-score').textContent=result.total;
   // 只统计当前考试的题目（按 examId 过滤）
   const examQs=DB.questions.filter(q=>{
     if(!q.examId) return false; // 老题（无examId）不参与当前考试统计
@@ -2499,13 +2499,13 @@ function doSubmit(){
       <div style="font-size:36px;font-weight:700;color:white">${result.total}<span style="font-size:16px;opacity:0.7"> / ${total}</span></div>
       <div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:4px">主观题（填空/简答）待人工复核后公布最终成绩</div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:14px;text-align:center">
       <div style="padding:10px;background:#eff6ff;border-radius:8px"><div class="fc-muted fs13">选择题（自动）</div><div style="font-size:18px;font-weight:700;color:var(--pri)">${result.choiceScore}/${cmax}</div></div>
       <div style="padding:10px;background:#f0fdf4;border-radius:8px"><div class="fc-muted fs13">填空题（参考）</div><div style="font-size:18px;font-weight:700;color:var(--ok)">${result.fillAutoScore}/${fmax}</div></div>
       <div style="padding:10px;background:#fffbeb;border-radius:8px"><div class="fc-muted fs13">简答题（参考）</div><div style="font-size:18px;font-weight:700;color:var(--warn)">${result.essayAutoScore}/${emax}</div></div>
       <div style="padding:10px;background:#fef2f2;border-radius:8px"><div class="fc-muted fs13">异常行为</div><div style="font-size:14px;font-weight:700;color:var(--err)">${cheatSummText}</div></div>
     </div>
-    <div style="margin-top:10px;font-size:13px;color:var(--muted)">提交时间：${new Date().toLocaleString()}</div>
+    <div style="margin-top:10px;font-size:13px;color:var(--muted);text-align:center">提交时间：${new Date().toLocaleString()}</div>
     ${offlineNotice}`;
 
   document.getElementById('monitor-bar').style.display='none';
