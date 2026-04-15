@@ -1520,15 +1520,16 @@ function showSyncBanner(msg, type){
   if(!bar){
     bar = document.createElement('div');
     bar.id = 'sync-banner';
-    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;padding:10px 20px;text-align:center;font-size:14px;font-weight:600;transition:opacity 0.5s';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;padding:10px 20px;text-align:center;font-size:14px;font-weight:600;transition:opacity 0.5s;pointer-events:none';
     document.body.prepend(bar);
   }
   bar.textContent = msg;
   bar.style.background = type === 'ok' ? '#dcfce7' : '#fef9c3';
   bar.style.color = type === 'ok' ? '#166534' : '#854d0e';
   bar.style.opacity = '1';
+  bar.style.pointerEvents = 'auto'; // 显示时允许点击
   clearTimeout(_syncBannerTimer);
-  _syncBannerTimer = setTimeout(()=>{ bar.style.opacity = '0'; }, 4000);
+  _syncBannerTimer = setTimeout(()=>{ bar.style.opacity = '0'; bar.style.pointerEvents = 'none'; }, 4000);
 }
 
 // 展开/收起服务器地址输入框
