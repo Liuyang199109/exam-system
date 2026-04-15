@@ -508,6 +508,7 @@ D.选项
         <div class="side-title">📋 答题进度</div>
         <div class="prog-bar"><div class="prog-fill" id="prog" style="width:0"></div></div>
         <div class="fs13 fc-muted mb2" id="prog-txt">已答 0 / 0 题</div>
+        <div id="auto-save-msg" style="font-size:11px;color:var(--ok);height:14px;margin-bottom:4px"></div>
         <div class="q-grid" id="q-nav"></div>
         <div class="divider" style="height:1px;background:var(--border);margin:12px 0"></div>
         <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--muted)">
@@ -1704,6 +1705,22 @@ function stuEnterExam(examId){
     antiCheat:exam.anti||{rec:true,cam:true,tab:true,fs:true},
     examData:exam
   };
+  // 检查是否有未提交的草稿
+  const draftKey='draft_'+exam.id+'_'+sid;
+  const draftStr=localStorage.getItem(draftKey);
+  if(draftStr){
+    try{
+      const draft=JSON.parse(draftStr);
+      const restore=confirm('检测到您有未完成的作答记录（保存时间：'+draft.savedAt+'），是否恢复？\n\n点击"确定"恢复上次的答题进度\n点击"取消"重新开始');
+      if(restore){
+        S.draftToRestore=draft;
+        toast('已加载上次答题进度，继续作答吧！','ok');
+      } else {
+        localStorage.removeItem(draftKey);
+        S.draftToRestore=null;
+      }
+    }catch(e){localStorage.removeItem(draftKey);}
+  }
   openM('m-notice');
   reqCamera();
 }
@@ -2158,6 +2175,14 @@ async function doStartExam(){
 
   // 初始化考试状态
   S.ans={}; S.flags=new Set(); S.tabs=0; S.cheatLog=[];
+  // 恢复草稿（如果有）
+  if(S.draftToRestore){
+    S.ans=S.draftToRestore.ans||{};
+    S.flags=new Set(S.draftToRestore.flags||[]);
+    S.tabs=S.draftToRestore.tabs||0;
+    S.cheatLog=S.draftToRestore.cheatLog||[];
+    S.draftToRestore=null;
+  }
   // 初始化视频本地暂存（跨网络兜底）
   S.scrLocalChunks=[]; S.camLocalChunks=[]; S.scrLocalOk=false; S.camLocalOk=false;
   // 启动静止检测
@@ -2174,6 +2199,22 @@ async function doStartExam(){
     startFaceDetection();
     startDeviceDetection();
   }, 1000);
+
+  // 启动答案自动保存（每30秒保存一次，防止意外丢失）
+  S.autoSaveTimer = setInterval(()=>{
+    const key = 'draft_' + S.exam.id + '_' + S.user.id;
+    const draft = {
+      ans: {...S.ans},
+      flags: [...S.flags],
+      tabs: S.tabs,
+      cheatLog: [...S.cheatLog],
+      savedAt: new Date().toLocaleString()
+    };
+    localStorage.setItem(key, JSON.stringify(draft));
+    // 在界面上短暂显示保存状态
+    const saveEl = document.getElementById('auto-save-msg');
+    if(saveEl){ saveEl.textContent = '💾 已自动保存'; setTimeout(()=>{ if(saveEl) saveEl.textContent=''; }, 2000); }
+  }, 30000);
 
   renderExamQs();
   renderQNav();
@@ -2419,79 +2460,60 @@ function confirmSub(){
 }
 
 function doSubmit(){
-  closeM('m-submit');
+  try {
+    closeM('m-submit');
+  } catch(e) {}
   clearInterval(S.timerH);
-  stopMonitor();
+  clearInterval(S.autoSaveTimer);
+  const draftKey = 'draft_' + S.exam.id + '_' + S.user.id;
+  localStorage.removeItem(draftKey);
+  try { stopMonitor(); } catch(e) {}
 
-  // 评分
-  const result=autoScore();
+  let result;
+  try { result = autoScore(); } catch(e) { result = {choiceScore:0, fillAutoScore:0, essayAutoScore:0, total:0, detail:{}}; }
 
-  // 检查本地视频片段（跨网络兜底）
   const hasLocalScr = S.scrLocalChunks.filter(Boolean).length > 0;
   const hasLocalCam = S.camLocalChunks.filter(Boolean).length > 0;
 
-  // 保存
   const subs=DB.submissions;
   subs[S.user.id]={
-    stu:S.user,
-    examId:S.exam.id,
-    examName:S.exam.name,
-    ans:{...S.ans},
-    choiceScore:result.choiceScore,
-    fillAutoScore:result.fillAutoScore,
-    essayAutoScore:result.essayAutoScore,
-    autoTotal:result.total,
-    autoDetail:result.detail,
-    cheatLog:[...S.cheatLog],
-    tabCnt:S.tabs,
-    submitAt:new Date().toLocaleString(),
-    finalScore:null,
-    teacherScores:{},
-    // 视频元数据（供管理员导入后查看）
+    stu:S.user, examId:S.exam.id, examName:S.exam.name, ans:{...S.ans},
+    choiceScore:result.choiceScore, fillAutoScore:result.fillAutoScore, essayAutoScore:result.essayAutoScore,
+    autoTotal:result.total, autoDetail:result.detail,
+    cheatLog:[...S.cheatLog], tabCnt:S.tabs,
+    submitAt:new Date().toLocaleString(), finalScore:null, teacherScores:{},
     videoMeta:{
-      screenChunks:S.scrLocalOk ? 'server' : (hasLocalScr ? 'local:'+S.scrLocalChunks.filter(Boolean).length : 'none'),
-      camChunks:S.camLocalOk ? 'server' : (hasLocalCam ? 'local:'+S.camLocalChunks.filter(Boolean).length : 'none'),
-      screenTotal:S.scrLocalChunks.filter(Boolean).length,
-      camTotal:S.camLocalChunks.filter(Boolean).length,
+      screenChunks:S.scrLocalOk?'server':(hasLocalScr?'local:'+S.scrLocalChunks.filter(Boolean).length:'none'),
+      camChunks:S.camLocalOk?'server':(hasLocalCam?'local:'+S.camLocalChunks.filter(Boolean).length:'none'),
+      screenTotal:S.scrLocalChunks.filter(Boolean).length, camTotal:S.camLocalChunks.filter(Boolean).length,
     },
   };
   DB.submissions=subs;
 
-  // 退全屏
   try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
 
-  // 显示结果
   document.getElementById('res-score').textContent=result.total;
-  // 只统计当前考试的题目（按 examId 过滤）
-  const examQs=DB.questions.filter(q=>{
-    if(!q.examId) return false; // 老题（无examId）不参与当前考试统计
-    return String(q.examId)===String(S.exam.id);
-  });
+  const examQs=DB.questions.filter(q=>q.examId && String(q.examId)===String(S.exam.id));
   const total=examQs.reduce((s,q)=>s+q.score,0);
   const cmax=examQs.filter(q=>q.type==='choice').reduce((s,q)=>s+q.score,0);
   const fmax=examQs.filter(q=>q.type==='fill').reduce((s,q)=>s+q.score,0);
   const emax=examQs.filter(q=>q.type==='essay').reduce((s,q)=>s+q.score,0);
 
-  // 跨网络提示
-  let offlineNotice = '';
-  if(hasLocalScr || hasLocalCam){
-    const scrInfo = hasLocalScr ? `录屏片段${S.scrLocalChunks.filter(Boolean).length}段` : '';
-    const camInfo = hasLocalCam ? `摄像头片段${S.camLocalChunks.filter(Boolean).length}段` : '';
-    offlineNotice = `<div style="margin-top:14px;padding:12px;background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;font-size:13px">
+  let offlineNotice='';
+  if(hasLocalScr||hasLocalCam){
+    offlineNotice=`<div style="margin-top:14px;padding:12px;background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;font-size:13px">
       <div style="font-weight:700;color:var(--warn);margin-bottom:6px">⚠️ 跨网络考试 — 请导出答卷和监控视频</div>
       <div style="color:#92400e">录屏/摄像头视频保存在本地。请点击下方按钮导出，交给管理员导入。</div>
       <button class="btn btn-warn btn-sm" style="margin-top:8px" onclick="exportStudentSubmission()">📦 导出答卷+视频</button>
     </div>`;
   }
 
-  // 人脸/设备检测统计
-  const faceCount = S.faceAlertCount || 0;
-  const deviceCount = S.deviceAlertCount || 0;
-  const cheatSumm = [];
-  if(S.tabs>0) cheatSumm.push(`${S.tabs}次切屏`);
+  const faceCount=S.faceAlertCount||0, deviceCount=S.deviceAlertCount||0;
+  const cheatSumm=[];
+  if(S.exam.antiCheat.tab&&S.tabs>0) cheatSumm.push(`${S.tabs}次切屏`);
   if(faceCount>0) cheatSumm.push(`${faceCount}次人脸异常`);
   if(deviceCount>0) cheatSumm.push(`${deviceCount}次设备异常`);
-  const cheatSummText = cheatSumm.length>0 ? cheatSumm.join(' / ') : '无';
+  const cheatSummText=cheatSumm.length>0?cheatSumm.join(' / '):'无';
 
   document.getElementById('res-detail').innerHTML=`
     <div style="margin-bottom:12px;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;text-align:center">
@@ -2511,8 +2533,8 @@ function doSubmit(){
   document.getElementById('monitor-bar').style.display='none';
   document.getElementById('cam-wrap').style.display='none';
   document.getElementById('cam-prev').style.display='none';
-  showPage('pg-result');
-  refreshStats();
+  try{ showPage('pg-result'); }catch(e){}
+  try{ refreshStats(); }catch(e){}
 }
 
 // 导出考生答卷+视频（跨网络场景）
@@ -3264,27 +3286,26 @@ function stopRecording() {
   const scrRec = S.scrRecorder, camRec = S.camRecorder;
   const stopRec = (rec, type) => {
     if (!rec) return;
-    clearInterval(rec._iv);
-    if (rec.state !== 'inactive') {
-      rec._uploadAndRestart();
-      try { rec.stop(); } catch(e) {}
+    try {
+      clearInterval(rec._iv);
+      // 保存当前片段
+      if (rec._chunks && rec._chunks.length > 0) {
+        const blob = new Blob(rec._chunks, { type: 'video/webm' });
+        // 异步上传，不阻塞
+        uploadChunk(type, blob, rec._chunkIdx || 0, 5);
+      }
+      // 直接停止，不调用 _uploadAndRestart（避免异步阻塞）
+      if (rec.state !== 'inactive') {
+        try { rec.stop(); } catch(e) {}
+      }
+    } catch(e) {
+      console.warn('[stopRecording] 停止录制异常:', e);
     }
   };
   stopRec(scrRec, 'screen');
   stopRec(camRec, 'cam');
   S.scrRecorder = null;
   S.camRecorder = null;
-  // 上传最终片段（使用上面保存的引用）
-  setTimeout(() => {
-    if (scrRec && scrRec._chunks && scrRec._chunks.length > 0) {
-      const blob = new Blob(scrRec._chunks, { type: 'video/webm' });
-      uploadChunk('screen', blob, S.scrChunksIdx, 5);
-    }
-    if (camRec && camRec._chunks && camRec._chunks.length > 0) {
-      const blob = new Blob(camRec._chunks, { type: 'video/webm' });
-      uploadChunk('cam', blob, S.camChunksIdx, 5);
-    }
-  }, 500);
 }
 
 function stopMonitor(){
