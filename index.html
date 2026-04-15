@@ -2855,10 +2855,11 @@ function onFS(){
   setTimeout(()=>{ try{document.documentElement.requestFullscreen();}catch(e){} },1500);
 }
 
-function noCtx(e){ if(S.role==='examinee') e.preventDefault(); }
+function noCtx(e){ if(S.role==='examinee' && S.exam) e.preventDefault(); }
 
 function onKey(e){
-  if(S.role!=='examinee') return;
+  // 只在考试进行中才启用防作弊
+  if(S.role!=='examinee' || !S.exam) return;
   if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&'IJC'.includes(e.key))){
     e.preventDefault();
     S.cheatLog.push({t:new Date().toLocaleTimeString(),type:'尝试打开开发者工具'});
@@ -5011,11 +5012,32 @@ function renderGradeTab(defer){
         <td><b>${autoTotal}</b>分</td>
         <td>${status} ${finalStr}</td>
         <td style="${diffBg?'background:'+diffBg+';':''}"><b style="color:${diffColor}">${diffStr}</b>分</td>
-        <td><button class="btn btn-pri btn-sm" data-sid="${esc(s.stu?.id||sid)}" onclick="openGrade(this.dataset.sid)">✍️ ${final!==null?'查看':'阅卷'}</button></td>
+        <td>
+          <button class="btn btn-pri btn-sm" data-sid="${esc(s.stu?.id||sid)}" onclick="openGrade(this.dataset.sid)">✍️ ${final!==null?'查看':'阅卷'}</button>
+          <button class="btn btn-sec btn-sm" data-sid="${esc(sid)}" onclick="allowRetake(this.dataset.sid)" title="清除此考生的答卷记录，允许其重新参加该考试">🔄 允许重考</button>
+        </td>
       </tr>`;
     }).join('');
   };
   if(defer){ (window.requestAnimationFrame||setTimeout)(doRender, 0); } else { doRender(); }
+}
+
+// 允许考生重考（清除该考生对某考试的答卷记录）
+function allowRetake(sid){
+  const sub = DB.submissions[sid];
+  if(!sub){
+    toast('❌ 未找到答卷记录','err');
+    return;
+  }
+  const stuName = sub.stu?.name || sid;
+  const examName = sub.examName || '该考试';
+  if(!confirm(`确定允许「${stuName}」重新参加「${examName}」吗？\n\n此操作将清除该考生对此考试的答卷记录，考生可再次进入考试。`)){
+    return;
+  }
+  delete DB.submissions[sid];
+  saveDB();
+  renderGradeTab();
+  toast(`✅ 已允许「${stuName}」重新参加「${examName}」`,'ok');
 }
 
 function openGrade(sid){
