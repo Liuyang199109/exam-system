@@ -213,15 +213,15 @@ input[type=number]:focus{border-color:var(--pri)}
     <!-- 考生 -->
     <div class="tp-panel active" id="tab0">
       <!-- 数据状态提示 -->
-      <div id="stu-data-hint" style="margin-bottom:14px;padding:10px 14px;background:#eff6ff;border-radius:8px;font-size:12px;color:#2563eb">
-        📌 <b>首次使用：</b>请点击下方按钮从服务器获取数据，或联系管理员获取数据文件后导入
+      <div id="stu-data-hint" style="margin-bottom:14px;padding:10px 14px;background:#eff6ff;border-radius:8px;font-size:12px;color:#2563eb;line-height:1.6">
+        📌 <b>首次使用：</b>正在从服务器获取数据，请稍候...
       </div>
       <div class="fg"><label>考生账号 / 学号</label><input id="l-sid" placeholder="请输入考生账号"></div>
       <div class="fg"><label>密码</label><input id="l-spass" type="password" placeholder="请输入密码"></div>
       <!-- 数据获取区 -->
       <div style="display:flex;gap:8px;margin-bottom:12px">
-        <button class="btn btn-sec btn-sm" style="flex:1" onclick="fetchDataFromServer()">🌐 从服务器拉取数据</button>
-        <label class="btn btn-sec btn-sm" style="flex:1;text-align:center;cursor:pointer;margin:0">📥 导入本地JSON<input type="file" accept=".json" style="display:none" onchange="importDataFile(event)"></label>
+        <button class="btn btn-sec btn-sm" style="flex:1" onclick="forceReloadData()">🔄 重试获取数据</button>
+        <label class="btn btn-sec btn-sm" style="flex:1;text-align:center;cursor:pointer;margin:0">📥 导入JSON文件<input type="file" accept=".json" style="display:none" onchange="importDataFile(event)"></label>
       </div>
       <!-- 服务器地址输入（初始隐藏） -->
       <div id="server-addr-box" style="display:none;margin-bottom:12px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
@@ -1355,176 +1355,155 @@ function updateStuDataHint(){
 }
 
 // ── accounts.json 自动加载（GitHub Pages / 免导入登录）────────────────
+// 作为 autoLoadFullData 的快速备用：30秒超时，单次尝试
 let _accountsLoaded = false; // 防止重复加载
 async function autoLoadAccountsJSON(){
   if(_accountsLoaded) return;
   _accountsLoaded = true;
   try {
-    const res = await fetch('accounts.json', {signal: AbortSignal.timeout(4000)});
+    const res = await fetch('accounts.json', {signal: AbortSignal.timeout(30000)});
     if(!res.ok) return;
     const data = await res.json();
-    if(!data || data.type !== 'accounts' || !Array.isArray(data.students) || data.students.length === 0) return;
-    // 合并账号：accounts.json 的账号优先覆盖默认示例账号
+    if(!data || !Array.isArray(data.students) || data.students.length === 0) return;
+    // 如果 autoLoadFullData 已经完成且有数据，跳过（以完整包优先）
+    if(_fullDataLoaded && _lastSyncSource === 'network') return;
+    // 合并账号：移除默认示例账号
     const defaults = ['student001','student002'];
     const newStudents = data.students.filter(s => !defaults.includes(s.id));
     if(newStudents.length === 0) return;
-    // 移除默认示例账号，加入 accounts.json 中的账号
-    const merged = [...newStudents];
-    DB.students = merged;
+    DB.students = newStudents;
     // 更新考试列表（如果 accounts.json 中有 exams 数据）
     if(Array.isArray(data.exams) && data.exams.length > 0){
       EXAM_LIST.list = data.exams;
     }
-    // 页面加载完成后才更新 UI
+    // 只有当 data.json 还未成功时才更新 UI
     setTimeout(()=>{
+      const isNewUser = (DB.students||[]).length <= 2 && (DB.students||[]).every(s=>s.id==='student001'||s.id==='student002');
+      if(isNewUser) return; // 没有账号就继续等待
       const hint = document.getElementById('stu-data-hint');
-      if(hint){
+      if(hint && (hint.innerHTML.includes('正在') || hint.innerHTML.includes('首次') || hint.innerHTML.includes('无法'))){
         hint.style.background='#f0fdf4'; hint.style.color='#16a34a';
-        hint.innerHTML=`✅ <b>账号已自动加载（accounts.json）</b>，共 ${merged.length} 名考生，可直接登录`;
+        hint.innerHTML=`✅ <b>考试数据已自动加载！</b>共 ${newStudents.length} 名考生账号${(data.exams||[]).length>0?'，'+(data.exams||[]).length+'个考试场次':''}，可直接登录`;
       }
-      // 如果在考生主页，重新渲染考试列表
       if(S.role === 'examinee') renderStuExamList();
     }, 600);
   } catch(e){
-    // silent fail，不影响正常流程
+    // silent fail
   }
 }
 
 // ── 完整数据包自动加载（GitHub Pages 自动同步考试+题目+账号）─────────
 let _fullDataLoaded = false; // 防止重复加载
-let _lastSyncSource = ''; // 记录最近一次同步来源（'network'=从网络更新，'cache'=使用缓存，'stale'=数据已是最新）
+let _lastSyncSource = ''; // 记录最近一次同步来源
+let _syncRetryCount = 0; // 重试次数
+
+// 内部：单次尝试拉取 data.json
+async function _tryLoadData(maxWaitMs){
+  const cacheBuster = '_t=' + Date.now();
+  const res = await fetch('data.json?' + cacheBuster, {signal: AbortSignal.timeout(maxWaitMs)});
+  if(!res.ok) return null;
+  return await res.json();
+}
+
+// 内部：应用数据到本地 DB
+function _applyCloudData(data){
+  if(!data || data.type !== 'full-package' || !data.exportedAt) return false;
+  const localSyncAt = localStorage.getItem('_lastSyncAt') || '';
+  if(data.exportedAt <= localSyncAt && localSyncAt !== '') return 'stale';
+  let updateCount = 0;
+  if(Array.isArray(data.students) && data.students.length > 0){
+    const defaults = ['student001','student002'];
+    const newStus = data.students.filter(s => !defaults.includes(s.id));
+    if(newStus.length > 0){ DB.students = newStus; updateCount++; }
+  }
+  if(Array.isArray(data.exams) && data.exams.length > 0){ EXAM_LIST.list = data.exams; updateCount++; }
+  if(Array.isArray(data.questions) && data.questions.length > 0){ DB.questions = data.questions; updateCount++; }
+  if(data.gradingRules && typeof data.gradingRules === 'object') DB.gradingRules = data.gradingRules;
+  if(data.submissions && typeof data.submissions === 'object'){
+    DB.submissions = {...data.submissions, ...(DB.submissions||{})};
+    updateCount++;
+  }
+  if(Array.isArray(data.depts)) DB.depts = data.depts;
+  localStorage.setItem('_lastSyncAt', data.exportedAt);
+  return updateCount > 0 ? 'updated' : 'nochange';
+}
+
+// 内部：处理失败状态
+function _handleSyncFail(msg, bgColor, txtColor){
+  _lastSyncSource = 'error';
+  const isNewUser = (DB.students||[]).length <= 2 && (DB.students||[]).every(s=>s.id==='student001'||s.id==='student002');
+  const hint = document.getElementById('stu-data-hint');
+  if(hint && isNewUser){ hint.style.background=bgColor; hint.style.color=txtColor; hint.innerHTML=msg; }
+  const syncMsg = document.getElementById('stu-sync-msg');
+  if(syncMsg){ syncMsg.textContent=msg.replace(/<[^>]+>/g,''); syncMsg.style.color=txtColor; }
+  const syncBar = document.getElementById('stu-sync-bar');
+  if(syncBar){ syncBar.style.background=bgColor; }
+}
+
+// 主加载函数：带重试逻辑，登录页和主页均可见状态变化
 async function autoLoadFullData(){
   if(_fullDataLoaded) return;
   _fullDataLoaded = true;
-  try {
-    // 强制禁用浏览器缓存：加上时间戳参数
-    const cacheBuster = '_t=' + Date.now();
-    const res = await fetch('data.json?' + cacheBuster, {signal: AbortSignal.timeout(5000)});
-    if(!res.ok){
-      _lastSyncSource = 'network-error';
-      return;
-    }
-    const data = await res.json();
-    if(!data || data.type !== 'full-package' || !data.exportedAt){
-      _lastSyncSource = 'invalid-data';
-      return;
-    }
+  _syncRetryCount = 0;
 
-    // 检查时间戳：只有 data.json 比本地数据更新时才合并
-    const localSyncAt = localStorage.getItem('_lastSyncAt') || '';
-    if(data.exportedAt <= localSyncAt && localSyncAt !== ''){
-      _lastSyncSource = 'stale'; // 本地数据已是最新
-      // 静默完成，不打扰用户
-      return;
-    }
+  // 立即更新 UI 状态（登录页和主页同步状态栏都更新）
+  const updateLoadingUI = (msg, bg, color) => {
+    const hint = document.getElementById('stu-data-hint');
+    if(hint){ hint.style.background=bg; hint.style.color=color; hint.innerHTML=msg; }
+    const syncMsg = document.getElementById('stu-sync-msg');
+    if(syncMsg){ syncMsg.textContent=msg.replace(/<[^>]+>/g,''); syncMsg.style.color=color; }
+    const syncBar = document.getElementById('stu-sync-bar');
+    if(syncBar){ syncBar.style.background=bg; }
+  };
 
-    let updateCount = 0;
+  updateLoadingUI('⏳ <b>正在从服务器拉取数据...</b>（请耐心等待，不要关闭页面）', '#eff6ff', '#2563eb');
 
-    // 1. 账号：完全替换（移除默认示例账号，加入 data.json 的账号）
-    if(Array.isArray(data.students) && data.students.length > 0){
-      const defaults = ['student001','student002'];
-      const newStus = data.students.filter(s => !defaults.includes(s.id));
-      if(newStus.length > 0){
-        DB.students = newStus;
-        updateCount++;
+  // 重试策略：第1次15秒，第2次20秒，第3次25秒
+  const timeouts = [15000, 20000, 25000];
+  for(let attempt = 0; attempt < timeouts.length; attempt++){
+    _syncRetryCount = attempt;
+    try {
+      const data = await _tryLoadData(timeouts[attempt]);
+      const result = data ? _applyCloudData(data) : null;
+      if(result === 'updated' || result === 'nochange' || result === 'stale'){
+        _lastSyncSource = 'network';
+        if(result === 'updated'){
+          updateLoadingUI(`✅ <b>考试数据已同步！</b>考试${(data.exams||[]).length}场 题目${(data.questions||[]).length}道 账号${(data.students||[]).length}人`, '#f0fdf4', '#16a34a');
+          showSyncBanner(`🎉 数据已同步！`, 'ok');
+          if(S.role==='examinee') renderStuExamList();
+          if(S.role==='admin'){ refreshStats(); renderQBank(); renderStus(); renderExamsHome(false); renderExamsTab(false); }
+        } else {
+          const t = localStorage.getItem('_lastSyncAt');
+          updateLoadingUI(`✅ <b>数据已是最新</b>（${t?new Date(t).toLocaleString('zh-CN'):'首次同步'}）`, '#f0fdf4', '#166534');
+        }
+        return;
+      }
+    } catch(e){
+      // 单次失败，等待后重试
+      if(attempt < timeouts.length - 1){
+        await new Promise(r => setTimeout(r, 3000));
+        updateLoadingUI(`⏳ 第${attempt+2}次尝试连接服务器...`, '#eff6ff', '#d97706');
       }
     }
+  }
 
-    // 2. 考试场次：完全替换（以部署的考试场次为准）
-    if(Array.isArray(data.exams) && data.exams.length > 0){
-      EXAM_LIST.list = data.exams;
-      updateCount++;
-    }
-
-    // 3. 题目：完全替换
-    if(Array.isArray(data.questions) && data.questions.length > 0){
-      DB.questions = data.questions;
-      updateCount++;
-    }
-
-    // 4. 评分规则
-    if(data.gradingRules && typeof data.gradingRules === 'object'){
-      DB.gradingRules = data.gradingRules;
-    }
-
-    // 5. 阅卷/答卷数据（智能合并：本地优先，云端补充）
-    if(data.submissions && typeof data.submissions === 'object'){
-      const localSubs = DB.submissions || {};
-      const cloudSubs = data.submissions;
-      // 策略：本地已有的答卷保留，云端新增的补充进来
-      const mergedSubs = {...cloudSubs, ...localSubs}; // local 覆盖 cloud
-      DB.submissions = mergedSubs;
-      updateCount++;
-    }
-
-    // 6. 部门
-    if(Array.isArray(data.depts)){
-      DB.depts = data.depts;
-    }
-
-    // 更新本地同步时间戳
-    localStorage.setItem('_lastSyncAt', data.exportedAt);
-    _lastSyncSource = 'network';
-
-        if(updateCount > 0){
-      // 页面加载完成后显示同步成功提示
-      setTimeout(()=>{
-        // 更新登录页状态
-        const hint = document.getElementById('stu-data-hint');
-        if(hint){
-          hint.style.background='#f0fdf4'; hint.style.color='#16a34a';
-          hint.innerHTML=`✅ <b>考试数据已自动同步！</b>考试${(data.exams||[]).length}场 题目${(data.questions||[]).length}道 账号${(data.students||[]).length}人`;
-        }
-        // 管理端：刷新界面
-        if(S.role === 'admin'){
-          refreshStats(); renderQBank(); renderStus();
-          renderExamsHome(false); renderExamsTab(false);
-        }
-        // 考生主页：刷新考试列表
-        if(S.role === 'examinee') renderStuExamList();
-
-        // 显示顶部同步成功条（4秒后淡出）
-        showSyncBanner(`🎉 检测到新数据（${new Date(data.exportedAt).toLocaleString('zh-CN')}），已自动同步！考试${(data.exams||[]).length}场 题目${(data.questions||[]).length}道 账号${(data.students||[]).length}人 答卷${Object.keys(data.submissions||{}).length}份`, 'ok');
-      }, 800);
-    } else {
-      // 数据没有变化，静默更新同步状态
-      setTimeout(()=>{
-        if(S.role === 'examinee'){
-          const syncMsg = document.getElementById('stu-sync-msg');
-          if(syncMsg){
-            const localSyncAt = localStorage.getItem('_lastSyncAt');
-            const dateStr = localSyncAt ? new Date(localSyncAt).toLocaleString('zh-CN') : '首次同步';
-            syncMsg.textContent = `✅ 数据已是最新（${dateStr}）`;
-            syncMsg.style.color = '#166534';
-          }
-        }
-      }, 1000);
-    }
-  } catch(e){
-    _lastSyncSource = 'error';
-    // 网络失败时也更新状态
-    setTimeout(()=>{
-      if(S.role === 'examinee'){
-        const syncMsg = document.getElementById('stu-sync-msg');
-        if(syncMsg){
-          syncMsg.textContent = '⚠️ 网络连接失败，使用本地缓存数据';
-          syncMsg.style.color = '#854d0e';
-          syncMsg.parentElement.style.background = '#fef9c3';
-        }
-      }
-    }, 1000);
+  // 所有重试都失败
+  const hasLocalData = (DB.students||[]).length > 2 || (DB.students||[]).some(s=>s.id!=='student001'&&s.id!=='student002');
+  if(hasLocalData){
+    _handleSyncFail('⚠️ <b>服务器连接超时</b>，已使用本地缓存数据', '#fef9c3', '#854d0e');
+  } else {
+    _handleSyncFail('⚠️ <b>无法连接服务器</b><br>请检查网络后点击「🔄 重试」，或联系管理员获取数据文件后导入', '#fef2f2', '#dc2626');
   }
 }
 
-// 强制刷新数据包（考生端可用：清除缓存记录，强制重新拉取）
+// 强制刷新数据包
 function forceReloadData(){
   const syncBar = document.getElementById('stu-sync-bar');
-  if(syncBar){ syncBar.style.background = '#eff6ff'; }
+  if(syncBar){ syncBar.style.background='#eff6ff'; syncBar.style.display='flex'; }
   const syncMsg = document.getElementById('stu-sync-msg');
-  if(syncMsg){
-    syncMsg.textContent = '⏳ 正在从服务器拉取最新数据...';
-    syncMsg.style.color = '#2563eb';
-  }
+  if(syncMsg){ syncMsg.textContent='⏳ 正在重新连接服务器...'; syncMsg.style.color='#2563eb'; }
+  const hint = document.getElementById('stu-data-hint');
+  if(hint){ hint.style.background='#eff6ff'; hint.style.color='#2563eb'; hint.innerHTML='⏳ <b>正在重新连接服务器...</b>'; }
   localStorage.removeItem('_lastSyncAt');
   _fullDataLoaded = false;
   autoLoadFullData();
