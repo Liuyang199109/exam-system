@@ -1399,27 +1399,47 @@ let _lastSyncSource = ''; // 记录最近一次同步来源
 let _syncRetryCount = 0; // 重试次数
 
 // 内部：单次尝试拉取 data.json
-async function _tryLoadData(maxWaitMs){
-  const cacheBuster = '_t=' + Date.now();
+async function _tryLoadData(maxWaitMs, forceRefresh){
+  // 强制刷新时使用更高精度的时间戳，并添加随机数确保绕过 CDN 缓存
+  const cacheBuster = forceRefresh 
+    ? '_t=' + Date.now() + '_r=' + Math.random().toString(36).substring(2,8)
+    : '_t=' + Date.now();
   const res = await fetch('data.json?' + cacheBuster, {signal: AbortSignal.timeout(maxWaitMs)});
   if(!res.ok) return null;
   return await res.json();
 }
 
 // 内部：应用数据到本地 DB
-function _applyCloudData(data){
+// forceRefresh: 强制刷新模式，忽略时间戳判断，强制应用所有数据
+function _applyCloudData(data, forceRefresh){
   if(!data || data.type !== 'full-package' || !data.exportedAt) return false;
-  const localSyncAt = localStorage.getItem('_lastSyncAt') || '';
-  if(data.exportedAt <= localSyncAt && localSyncAt !== '') return 'stale';
+  
+  // 强制刷新模式：跳过时间戳判断，强制应用数据
+  if(!forceRefresh){
+    const localSyncAt = localStorage.getItem('_lastSyncAt') || '';
+    if(data.exportedAt <= localSyncAt && localSyncAt !== '') return 'stale';
+  }
+  
   let updateCount = 0;
+  // students：替换而非合并（确保旧账号被清理）
   if(Array.isArray(data.students) && data.students.length > 0){
     const defaults = ['student001','student002'];
     const newStus = data.students.filter(s => !defaults.includes(s.id));
     if(newStus.length > 0){ DB.students = newStus; updateCount++; }
   }
-  if(Array.isArray(data.exams) && data.exams.length > 0){ EXAM_LIST.list = data.exams; updateCount++; }
-  if(Array.isArray(data.questions) && data.questions.length > 0){ DB.questions = data.questions; updateCount++; }
-  if(data.gradingRules && typeof data.gradingRules === 'object') DB.gradingRules = data.gradingRules;
+  // exams：替换（考试场次变化是关键同步目标）
+  if(Array.isArray(data.exams)){
+    EXAM_LIST.list = data.exams; updateCount++;
+  }
+  // questions：替换
+  if(Array.isArray(data.questions) && data.questions.length > 0){
+    DB.questions = data.questions; updateCount++;
+  }
+  // gradingRules：替换
+  if(data.gradingRules && typeof data.gradingRules === 'object'){
+    DB.gradingRules = data.gradingRules; updateCount++;
+  }
+  // submissions：合并（保留本地阅卷数据）
   if(data.submissions && typeof data.submissions === 'object'){
     DB.submissions = {...data.submissions, ...(DB.submissions||{})};
     updateCount++;
@@ -1442,8 +1462,9 @@ function _handleSyncFail(msg, bgColor, txtColor){
 }
 
 // 主加载函数：带重试逻辑，登录页和主页均可见状态变化
-async function autoLoadFullData(){
-  if(_fullDataLoaded) return;
+// forceRefresh: 强制刷新模式，绕过 CDN 缓存并强制应用新数据
+async function autoLoadFullData(forceRefresh){
+  if(_fullDataLoaded && !forceRefresh) return;
   _fullDataLoaded = true;
   _syncRetryCount = 0;
 
@@ -1464,8 +1485,8 @@ async function autoLoadFullData(){
   for(let attempt = 0; attempt < timeouts.length; attempt++){
     _syncRetryCount = attempt;
     try {
-      const data = await _tryLoadData(timeouts[attempt]);
-      const result = data ? _applyCloudData(data) : null;
+      const data = await _tryLoadData(timeouts[attempt], forceRefresh);
+      const result = data ? _applyCloudData(data, forceRefresh) : null;
       if(result === 'updated' || result === 'nochange' || result === 'stale'){
         _lastSyncSource = 'network';
         // 无论数据是否有更新，都要渲染考试列表
@@ -1499,17 +1520,16 @@ async function autoLoadFullData(){
   }
 }
 
-// 强制刷新数据包
+// 强制刷新数据包：绕过 CDN 缓存，强制应用新数据
 function forceReloadData(){
   const syncBar = document.getElementById('stu-sync-bar');
   if(syncBar){ syncBar.style.background='#eff6ff'; syncBar.style.display='flex'; }
   const syncMsg = document.getElementById('stu-sync-msg');
   if(syncMsg){ syncMsg.textContent='⏳ 正在重新连接服务器...'; syncMsg.style.color='#2563eb'; }
   const hint = document.getElementById('stu-data-hint');
-  if(hint){ hint.style.background='#eff6ff'; hint.style.color='#2563eb'; hint.innerHTML='⏳ <b>正在重新连接服务器...</b>'; }
-  localStorage.removeItem('_lastSyncAt');
+  if(hint){ hint.style.background='#eff6ff'; hint.style.color='#2563eb'; hint.innerHTML='⏳ <b>正在强制刷新（绕过缓存）...</b>'; }
   _fullDataLoaded = false;
-  autoLoadFullData();
+  autoLoadFullData(true); // true = forceRefresh，绕过 CDN 缓存并强制应用数据
   toast('🔄 正在强制刷新考试数据...', 'info');
 }
 
