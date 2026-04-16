@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "type": "accounts",
-  "exportedAt": "2026-04-16T08:07:56.390Z",
+  "exportedAt": "2026-04-16T10:11:27.393Z",
   "students": [
     {
       "id": "student001",
@@ -15,7 +15,7 @@
       "name": "李四",
       "pass": "123456",
       "examId": 1,
-      "dept": ""
+      "dept": "BU2"
     },
     {
       "id": "laiph",
@@ -118,6 +118,12 @@
       "name": "黄静",
       "pass": "123456",
       "dept": "BU2"
+    },
+    {
+      "id": "ces2",
+      "name": "测试2",
+      "pass": "123456",
+      "dept": ""
     }
   ]
 }
