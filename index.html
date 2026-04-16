@@ -2517,6 +2517,19 @@ function doSubmit(){
   } catch(e) {}
   clearInterval(S.timerH);
   clearInterval(S.autoSaveTimer);
+
+  // ★ 交卷后设置离开页面警告（如果有本地视频则强调视频会丢失）
+  const hasLocalScr = S.scrLocalChunks.filter(Boolean).length > 0;
+  const hasLocalCam = S.camLocalChunks.filter(Boolean).length > 0;
+  const hasLocalVideo = hasLocalScr || hasLocalCam;
+  const warnMsg = hasLocalVideo
+    ? '⚠️ 关闭页面后，录屏和摄像头视频将无法导出！请确保已导出答卷和视频！'
+    : '⚠️ 关闭页面后，如需导出视频将无法获取！请确认是否已导出所需文件？';
+  window.onbeforeunload = function(e) {
+    e.preventDefault();
+    e.returnValue = warnMsg;
+    return warnMsg;
+  };
   const draftKey = 'draft_' + S.exam.id + '_' + S.user.id;
   localStorage.removeItem(draftKey);
 
