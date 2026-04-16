@@ -2552,9 +2552,6 @@ function doSubmit(){
   let result;
   try { result = autoScore(); } catch(e) { result = {choiceScore:0, fillAutoScore:0, essayAutoScore:0, total:0, detail:{}}; }
 
-  // ★ 判断是否有本地视频：localChunks 有内容，或者考试配置了录屏/摄像头（服务器可能上传成功）
-  const hasLocalScr = S.scrLocalChunks.filter(Boolean).length > 0;
-  const hasLocalCam = S.camLocalChunks.filter(Boolean).length > 0;
   // ★ 无论是否跨网络，只要有监控配置就提供导出入口（服务器上传成功时也可按需导出）
   const antiCheat = S.exam?.antiCheat || {};
   const hadMonitoring = antiCheat.rec || antiCheat.cam || hasLocalScr || hasLocalCam;
