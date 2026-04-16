@@ -1,6 +1,7 @@
 {
+  "version": "1.0",
   "type": "accounts",
-  "updatedAt": "2026-04-15T10:02:59.681Z",
+  "exportedAt": "2026-04-16T08:07:56.390Z",
   "students": [
     {
       "id": "student001",
@@ -113,63 +114,10 @@
       "dept": "BU2"
     },
     {
-      "id": "haungj",
+      "id": "huangj",
       "name": "黄静",
       "pass": "123456",
       "dept": "BU2"
-    }
-  ],
-  "exams": [
-    {
-      "id": 1775462611620,
-      "name": "BU2模拟测试",
-      "sub": "理论研究",
-      "duration": 180,
-      "startTime": "2026-04-08T15:00",
-      "endTime": "2026-04-08T18:00",
-      "studentIds": [
-        "student001"
-      ],
-      "anti": {
-        "rec": true,
-        "cam": true,
-        "tab": false,
-        "fs": false
-      }
-    },
-    {
-      "id": 1776080473520,
-      "name": "2026年BU2第三次培训考试",
-      "sub": "预处理算法选择",
-      "duration": 1919,
-      "startTime": "2026-04-15T16:00",
-      "endTime": "2026-04-16T23:59",
-      "studentIds": [
-        "student001",
-        "laiph",
-        "zhangl",
-        "ces",
-        "zhanght",
-        "wanghl",
-        "yewq",
-        "zhangxy",
-        "huangqd",
-        "xiaozr",
-        "xiaox",
-        "shensx",
-        "lingm",
-        "wangj",
-        "zhaoqy",
-        "wangyq",
-        "dilxt",
-        "haungj"
-      ],
-      "anti": {
-        "rec": true,
-        "cam": true,
-        "tab": false,
-        "fs": false
-      }
     }
   ]
 }

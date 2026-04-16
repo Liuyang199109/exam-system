@@ -940,13 +940,24 @@ D.选项
       </div>
       <!-- 添加规则 -->
       <div id="gr-add-section" style="display:none">
-        <div style="font-weight:700;margin-bottom:8px;font-size:14px">➕ 为此题添加自定义规则</div>
-        <div class="fg" style="margin-bottom:8px">
-          <label>规则描述</label>
-          <input type="text" id="gr-new-rule" placeholder="例如：填空第1空答"催化燃烧"应给满分 或 简答含"自由基"给6分" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px">
+        <div style="font-weight:700;margin-bottom:8px;font-size:14px">➕ 为此题添加自定义评分规则</div>
+        <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <div class="fg" style="flex:2;min-width:200px;margin-bottom:0">
+            <label style="font-size:13px">触发条件关键词 <span style="color:var(--muted);font-weight:400">（可选，多个用逗号分隔，留空则对该题无条件生效）</span></label>
+            <input type="text" id="gr-new-condition" placeholder="例如：自由基,催化 （考生答案含这些词时命中）" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box">
+          </div>
+          <div class="fg" style="flex:0 0 120px;margin-bottom:0">
+            <label style="font-size:13px">命中后得分 <span style="color:var(--err)">*</span></label>
+            <input type="number" id="gr-new-score" placeholder="如：6" min="0" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box">
+          </div>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
-          💡 提示：描述中包含题目关键词或答案片段即可关联到此题。支持写"满分"/"给X分"/"不给分"等。
+        <div class="fg" style="margin-bottom:8px">
+          <label style="font-size:13px">规则说明 <span style="color:var(--muted);font-weight:400">（可选，便于识别）</span></label>
+          <input type="text" id="gr-new-rule" placeholder="例如：提到催化燃烧原理即可给满分" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box">
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;background:#fffbeb;padding:8px 12px;border-radius:6px;border:1px solid #fde68a">
+          💡 <b>使用说明</b>：填写"得分"后点击添加即可生效。条件留空=无条件命中该题用此规则；填写条件=答案中含指定词才命中。<br>
+          ⚠️ 同一题可添加多条规则，系统会取<b>所有命中规则中最高分</b>作为建议分。
         </div>
         <button class="btn btn-ok btn-sm" onclick="addGradingRule()">✅ 添加规则</button>
       </div>
@@ -1335,8 +1346,9 @@ function loginStudent(){
   if(nameEl) nameEl.textContent=stu.name||stu.id;
   if(avatarEl) avatarEl.textContent=(stu.name||stu.id).charAt(0).toUpperCase();
   showPage('pg-stu');
-  // 确保考试列表被渲染（即使 autoLoadFullData 还未完成，renderStuExamList 也会读取当前 EXAM_LIST.list）
-  renderStuExamList();
+  // 延迟渲染考试列表，确保 autoLoadFullData() 有机会先更新 localStorage
+  // 避免首次登录时数据还没加载完成就渲染，导致显示"未进行"
+  setTimeout(() => renderStuExamList(), 150);
 }
 
 // 更新考生登录页数据状态提示
@@ -1696,13 +1708,16 @@ function renderStuExamList(){
       const showAns=isEnded||submitted;
       const ansBtn=showAns?`<button class="btn btn-sec btn-sm" onclick="stuViewAnswers(${exam.id})">📖 查看参考答案</button>`:'';
 
+      // ★ 导出答卷按钮（仅已提交的考试显示）
+      const exportBtn=submitted?`<button class="btn btn-warn btn-sm" onclick="exportStuHistoryRecord('${exam.id}')">📦 导出答卷+视频</button>`:'';
+
       return `<div class="stu-exam-card">
         <div class="stu-exam-card-hd">
           <div>
             <div class="stu-exam-name">${esc(exam.name)}</div>
             <div class="stu-exam-meta">${statusBadge}${exam.endTime?`<span>截止：${exam.endTime}</span>`:''}</div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">${ansBtn}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${exportBtn}${ansBtn}</div>
         </div>
         ${scoreHtml}
       </div>`;
@@ -2040,27 +2055,29 @@ function renderGradingRulesForQ(qId){
     list.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px">暂无自定义规则，点击下方添加</div>';
     return;
   }
-  list.innerHTML=ruleArr.map(([key,rule])=>`
+  list.innerHTML=ruleArr.map(([key,rule])=>{
+    // 兼容旧格式（只有desc）和新格式（有score+condition）
+    const hasNewFormat = rule.score !== undefined;
+    const scoreTag = hasNewFormat
+      ? `<span class="badge b-green" style="font-size:12px">命中→${rule.score}分</span>`
+      : '<span class="badge b-gray" style="font-size:11px">旧格式（建议重建）</span>';
+    const condTag = hasNewFormat && rule.condition
+      ? `<span class="badge b-blue" style="font-size:12px;margin-left:4px">含"${esc(rule.condition)}"时触发</span>`
+      : (hasNewFormat ? '<span class="badge b-yellow" style="font-size:12px;margin-left:4px">无条件触发</span>' : '');
+    return `
     <div style="padding:10px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:#f8fafc" id="grule-${esc(key)}">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
         <div style="flex:1">
-          <div id="grule-desc-${esc(key)}" style="font-weight:600;color:var(--pri);font-size:14px;line-height:1.4">✏️ ${esc(rule.desc)}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:3px">创建于：${rule.createdAt?new Date(rule.createdAt).toLocaleString():'未知'}</div>
-          <div id="grule-edit-${esc(key)}" style="display:none;margin-top:8px">
-            <input id="grule-input-${esc(key)}" class="form-input" value="${esc(rule.desc)}" style="width:100%;font-size:13px" />
-          </div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">${scoreTag}${condTag}</div>
+          <div id="grule-desc-${esc(key)}" style="font-size:13px;color:#374151;line-height:1.5">${esc(rule.desc)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">创建于：${rule.createdAt?new Date(rule.createdAt).toLocaleString():'未知'}</div>
         </div>
-        <div style="display:flex;gap:6px;flex-shrink:0" id="grule-btns-${esc(key)}">
-          <button class="btn btn-sec btn-sm" onclick="editGradingRule('${esc(key)}')">✏️ 编辑</button>
-          <button class="btn btn-err btn-sm" onclick="delGradingRule('${esc(key)}')">🗑</button>
-        </div>
-        <div style="display:none;gap:6px;flex-shrink:0" id="grule-save-btns-${esc(key)}">
-          <button class="btn btn-ok btn-sm" onclick="saveGradingRule('${esc(key)}')">💾 保存</button>
-          <button class="btn btn-sec btn-sm" onclick="cancelEditRule('${esc(key)}')">取消</button>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-err btn-sm" onclick="delGradingRule('${esc(key)}')">🗑 删除</button>
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 function editGradingRule(key){
@@ -2112,13 +2129,28 @@ function renderGradingRules(){
 function addGradingRule(){
   const qId=document.getElementById('gr-q-sel').value;
   if(!qId){ toast('请先选择题目','warn'); return; }
-  const desc=document.getElementById('gr-new-rule').value.trim();
-  if(!desc){ toast('请输入规则描述','warn'); return; }
+  // 新格式：从专属输入框读取分值和条件
+  const scoreEl=document.getElementById('gr-new-score');
+  const scoreVal=scoreEl?scoreEl.value.trim():'';
+  if(scoreVal===''||isNaN(parseFloat(scoreVal))){ toast('请填写命中后得分','warn'); if(scoreEl)scoreEl.focus(); return; }
+  const score=parseFloat(scoreVal);
+  const condition=(document.getElementById('gr-new-condition')?.value||'').trim();
+  const desc=(document.getElementById('gr-new-rule')?.value||'').trim();
   const rules=DB.gradingRules;
   const key='rule_'+Date.now();
-  rules[key]={qId, desc, createdAt:new Date().toISOString()};
+  rules[key]={
+    qId,
+    score,                       // ★ 明确的分值
+    condition: condition||'',    // ★ 触发条件关键词（逗号分隔，空=无条件命中）
+    desc: desc||(condition?`含"${condition}"得${score}分`:`固定得${score}分`),
+    createdAt: new Date().toISOString()
+  };
   DB.gradingRules=rules;
-  document.getElementById('gr-new-rule').value='';
+  if(scoreEl) scoreEl.value='';
+  const condEl=document.getElementById('gr-new-condition');
+  if(condEl) condEl.value='';
+  const descEl=document.getElementById('gr-new-rule');
+  if(descEl) descEl.value='';
   renderGradingRulesForQ(qId);
   toast('✅ 规则已添加','ok');
 }
@@ -2487,13 +2519,32 @@ function doSubmit(){
   clearInterval(S.autoSaveTimer);
   const draftKey = 'draft_' + S.exam.id + '_' + S.user.id;
   localStorage.removeItem(draftKey);
+
+  // ★ 在 stopMonitor 之前先同步 flush 录屏/摄像头片段到 localChunks
+  // 这样 hasLocalScr/hasLocalCam 能正确反映是否有视频数据
+  try {
+    const flushRec = (rec, type) => {
+      if(!rec || !rec._chunks || rec._chunks.length === 0) return;
+      const blob = new Blob(rec._chunks, { type: 'video/webm' });
+      const idx = rec._chunkIdx || 0;
+      if(type === 'screen') S.scrLocalChunks[idx] = blob;
+      else S.camLocalChunks[idx] = blob;
+    };
+    flushRec(S.scrRecorder, 'screen');
+    flushRec(S.camRecorder, 'cam');
+  } catch(e) {}
+
   try { stopMonitor(); } catch(e) {}
 
   let result;
   try { result = autoScore(); } catch(e) { result = {choiceScore:0, fillAutoScore:0, essayAutoScore:0, total:0, detail:{}}; }
 
+  // ★ 判断是否有本地视频：localChunks 有内容，或者考试配置了录屏/摄像头（服务器可能上传成功）
   const hasLocalScr = S.scrLocalChunks.filter(Boolean).length > 0;
   const hasLocalCam = S.camLocalChunks.filter(Boolean).length > 0;
+  // ★ 无论是否跨网络，只要有监控配置就提供导出入口（服务器上传成功时也可按需导出）
+  const antiCheat = S.exam?.antiCheat || {};
+  const hadMonitoring = antiCheat.rec || antiCheat.cam || hasLocalScr || hasLocalCam;
 
   const subs=DB.submissions;
   subs[S.user.id]={
@@ -2520,12 +2571,23 @@ function doSubmit(){
   const emax=examQs.filter(q=>q.type==='essay').reduce((s,q)=>s+q.score,0);
 
   let offlineNotice='';
-  if(hasLocalScr||hasLocalCam){
-    offlineNotice=`<div style="margin-top:14px;padding:12px;background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;font-size:13px">
-      <div style="font-weight:700;color:var(--warn);margin-bottom:6px">⚠️ 跨网络考试 — 请导出答卷和监控视频</div>
-      <div style="color:#92400e">录屏/摄像头视频保存在本地。请点击下方按钮导出，交给管理员导入。</div>
-      <button class="btn btn-warn btn-sm" style="margin-top:8px" onclick="exportStudentSubmission()">📦 导出答卷+视频</button>
-    </div>`;
+  if(hadMonitoring){
+    const hasVideo = hasLocalScr || hasLocalCam;
+    if(hasVideo){
+      // 有本地视频：跨网络场景，需要导出给管理员
+      offlineNotice=`<div style="margin-top:14px;padding:12px;background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;font-size:13px">
+        <div style="font-weight:700;color:var(--warn);margin-bottom:6px">⚠️ 跨网络考试 — 请导出答卷和监控视频</div>
+        <div style="color:#92400e">录屏/摄像头视频保存在本地。请点击下方按钮导出，交给管理员导入。</div>
+        <button class="btn btn-warn btn-sm" style="margin-top:8px" onclick="exportStudentSubmission()">📦 导出答卷+视频</button>
+      </div>`;
+    } else {
+      // 视频已上传服务器，仍提供备用导出入口
+      offlineNotice=`<div style="margin-top:14px;padding:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;font-size:13px">
+        <div style="font-weight:700;color:#166534;margin-bottom:4px">✅ 监控视频已上传服务器</div>
+        <div style="color:#166534;margin-bottom:6px">如需备份答卷记录，也可点击下方按钮手动导出。</div>
+        <button class="btn btn-sec btn-sm" onclick="exportStudentSubmission()">📦 导出答卷备份</button>
+      </div>`;
+    }
   }
 
   const faceCount=S.faceAlertCount||0, deviceCount=S.deviceAlertCount||0;
@@ -2534,6 +2596,9 @@ function doSubmit(){
   if(faceCount>0) cheatSumm.push(`${faceCount}次人脸异常`);
   if(deviceCount>0) cheatSumm.push(`${deviceCount}次设备异常`);
   const cheatSummText=cheatSumm.length>0?cheatSumm.join(' / '):'无';
+
+  // ★ 交卷后可导出的答案JSON（用于参考答案按钮）
+  const exportAnswerBtn=`<button class="btn btn-sec btn-sm" style="margin-top:6px" onclick="exportMyAnswer()">📥 导出答案文件</button>`;
 
   document.getElementById('res-detail').innerHTML=`
     <div style="margin-bottom:12px;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;text-align:center">
@@ -2548,6 +2613,16 @@ function doSubmit(){
       <div style="padding:10px;background:#fef2f2;border-radius:8px"><div class="fc-muted fs13">异常行为</div><div style="font-size:14px;font-weight:700;color:var(--err)">${cheatSummText}</div></div>
     </div>
     <div style="margin-top:10px;font-size:13px;color:var(--muted);text-align:center">提交时间：${new Date().toLocaleString()}</div>
+    <div style="margin-top:14px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid var(--border)">
+      <div style="font-weight:700;margin-bottom:8px">📋 交卷后可执行的操作</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
+        <button class="btn btn-pri btn-sm" onclick="stuViewAnswers(S.exam.id)">📖 查看参考答案</button>
+        ${exportAnswerBtn}
+      </div>
+      <div style="margin-top:10px;padding:10px;background:#fffbeb;border-radius:8px;font-size:12px;color:#92400e">
+        💡 提示：导出答案文件包含您的作答记录和题目信息，方便留存备份或后续查看。
+      </div>
+    </div>
     ${offlineNotice}`;
 
   document.getElementById('monitor-bar').style.display='none';
@@ -2555,6 +2630,55 @@ function doSubmit(){
   document.getElementById('cam-prev').style.display='none';
   try{ showPage('pg-result'); }catch(e){}
   try{ refreshStats(); }catch(e){}
+}
+
+// ★ 导出考生答案文件（包含作答记录和题目信息，不含视频）
+function exportMyAnswer(){
+  const sub = DB.submissions[S.user.id];
+  if(!sub){ toast('未找到交卷记录','err'); return; }
+  const sid = S.user.id;
+  const examId = S.exam.id;
+  
+  // 获取当前考试的题目信息
+  const examQs=DB.questions.filter(q=>q.examId && String(q.examId)===String(examId));
+  
+  // 构建答案导出数据
+  const answerData = {
+    version: '1.2',
+    type: 'student-answer-export',
+    exportedAt: new Date().toISOString(),
+    examId: examId,
+    examName: S.exam.name,
+    studentId: sid,
+    studentName: S.user.name,
+    submitAt: sub.submitAt,
+    scores: {
+      choiceScore: sub.choiceScore || 0,
+      fillAutoScore: sub.fillAutoScore || 0,
+      essayAutoScore: sub.essayAutoScore || 0,
+      autoTotal: sub.autoTotal || 0,
+    },
+    answers: sub.ans || {},
+    questions: examQs.map((q,idx)=>({
+      index: idx,
+      type: q.type,
+      content: q.content,
+      score: q.score,
+      options: q.opts,
+      correctAnswer: q.answer || q.refAns,
+      keywords: q.keywords,
+      userAnswer: sub.ans ? sub.ans[idx] : null,
+    })),
+  };
+  
+  const blob = new Blob([JSON.stringify(answerData, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `答案_${sid}_${S.exam.name}_${new Date().toLocaleDateString('zh-CN').replace(/\//g,'-')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 答案文件已导出','ok');
 }
 
 // 导出考生答卷+视频（跨网络场景）
@@ -2620,6 +2744,71 @@ function exportStudentSubmission(){
   });
 
   toast(`✅ 已导出：答卷JSON + 录屏${scrChunks.length}段 + 摄像头${camChunks.length}段，请交给管理员`,'ok');
+}
+
+// ★ 从历史考试列表随时导出答卷+视频
+// 与 exportStudentSubmission 的区别：不依赖 S.exam，支持事后随时导出
+// 如果当前会话中仍有内存视频（刚交卷未离开页面）则同时导出视频；否则仅导出答卷JSON
+function exportStuHistoryRecord(examId){
+  if(!S.user){ toast('请先登录','err'); return; }
+  const sid = S.user.id;
+  const sub = DB.submissions[sid];
+  if(!sub || String(sub.examId) !== String(examId)){ toast('未找到该考试的交卷记录','err'); return; }
+
+  // 判断内存中是否还有视频（刚交卷且未退出页面）
+  const scrChunks = (S.scrLocalChunks||[]).filter(Boolean);
+  const camChunks = (S.camLocalChunks||[]).filter(Boolean);
+  const hasVideo = scrChunks.length > 0 || camChunks.length > 0;
+
+  const subData = {
+    version: '1.1',
+    type: 'student-submission',
+    examId: sub.examId,
+    studentId: sid,
+    studentName: S.user.name || sid,
+    examName: sub.examName || '',
+    submission: sub,
+    videoInfo: {
+      examId: sub.examId,
+      studentId: sid,
+      screenChunks: scrChunks.length,
+      camChunks: camChunks.length,
+      exportedAt: new Date().toISOString(),
+      note: hasVideo ? '包含视频片段' : '仅包含答卷数据，视频片段已不在内存中（已上传服务器或会话已结束）',
+    },
+  };
+  const blob = new Blob([JSON.stringify(subData, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `答卷_${sid}_${sub.examName||examId}_${new Date().toLocaleDateString('zh-CN').replace(/\//g,'-')}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  // 如果内存中还有视频，一并下载
+  let delay = 200;
+  if(hasVideo){
+    scrChunks.forEach((b, i) => {
+      setTimeout(() => {
+        const u = URL.createObjectURL(b);
+        const el = document.createElement('a');
+        el.href = u; el.download = `录屏_${sid}_${sub.examId}_${i+1}.webm`; el.click();
+        URL.revokeObjectURL(u);
+      }, delay);
+      delay += 200;
+    });
+    camChunks.forEach((b, i) => {
+      setTimeout(() => {
+        const u = URL.createObjectURL(b);
+        const el = document.createElement('a');
+        el.href = u; el.download = `摄像头_${sid}_${sub.examId}_${i+1}.webm`; el.click();
+        URL.revokeObjectURL(u);
+      }, delay);
+      delay += 200;
+    });
+    toast(`✅ 已导出答卷JSON + 录屏${scrChunks.length}段 + 摄像头${camChunks.length}段`, 'ok');
+  } else {
+    toast(`✅ 已导出答卷JSON（视频已上传服务器或会话已结束，无需再次导出）`, 'ok');
+  }
 }
 
 // 管理员导入考生答卷（含视频）
@@ -2734,40 +2923,52 @@ function autoScore(){
 }
 
 // 检查人工自定义评分规则
-// 如果命中规则，返回指定分数；否则返回null继续使用默认规则
+// 返回值：命中规则时返回分数（数字）；未命中返回 null
+// 多条规则都命中时，取最高分
 function checkCustomRule(q, userAnswer){
-  const rules=DB.gradingRules;
-  const ua=(userAnswer||'').toLowerCase();
-  const qc=(q.content||'').toLowerCase();
-  const qa=(q.answer||'').toLowerCase();
-  for(const [key,rule] of Object.entries(rules)){
-    const desc=(rule.desc||'').toLowerCase();
-    // 优先：规则关联到当前题目
-    if(rule.qId && String(rule.qId)===String(q.id)){
-      const scoreMatch=desc.match(/(\d+(?:\.\d+)?)\s*分/);
-      if(scoreMatch){
-        return Math.round(parseFloat(scoreMatch[1]));
+  const rules = DB.gradingRules;
+  const ua = (userAnswer || '').toLowerCase();
+  let bestScore = null; // 所有命中规则中的最高分
+
+  for(const [key, rule] of Object.entries(rules)){
+    // 只处理关联到当前题目的规则
+    if(!rule.qId || String(rule.qId) !== String(q.id)) continue;
+
+    // ── 新格式：有明确 score 字段 ──────────────────────
+    if(rule.score !== undefined){
+      const score = parseFloat(rule.score);
+      const condition = (rule.condition || '').trim();
+      let hit = false;
+      if(!condition){
+        // 无条件：直接命中
+        hit = true;
+      } else {
+        // 有条件：检查 userAnswer 是否包含所有关键词（逗号分隔，全部满足才命中）
+        const conds = condition.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        hit = conds.length > 0 && conds.every(c => ua.includes(c));
       }
-      if(desc.includes('满分')) return q.score;
-      if(desc.includes('不给分')||desc.includes('零分')||desc.includes('不给')) return 0;
-      return null; // 有规则但无明确分值，让默认逻辑处理
-    }
-    // 兜底：旧规则（无qId）按内容关键词匹配
-    if(!rule.qId){
-      const isRelated=
-        qc.length>=5 && desc.includes(qc.substring(0,Math.min(10,qc.length)))||
-        qa.length>=3 && desc.includes(qa.substring(0,Math.min(5,qa.length)))||
-        (q.keywords||'').toLowerCase().split(',').some(k=>desc.includes(k.trim()));
-      if(isRelated){
-        const scoreMatch=desc.match(/(\d+)\s*[分个]/);
-        if(scoreMatch) return parseInt(scoreMatch[1]);
-        if(desc.includes('满分')||desc.includes('给分')||desc.includes('正确')) return q.score;
-        if(desc.includes('不给分')||desc.includes('错误')||desc.includes('零分')) return 0;
+      if(hit){
+        if(bestScore === null || score > bestScore) bestScore = score;
       }
+      continue;
     }
+
+    // ── 旧格式兼容：只有 desc 字段，解析文本中的分值关键词 ─
+    const desc = (rule.desc || '').toLowerCase();
+    const scoreMatch = desc.match(/(\d+(?:\.\d+)?)\s*分/);
+    if(scoreMatch){
+      const score = parseFloat(scoreMatch[1]);
+      if(bestScore === null || score > bestScore) bestScore = score;
+      continue;
+    }
+    if(desc.includes('满分')){ const s=q.score; if(bestScore===null||s>bestScore) bestScore=s; continue; }
+    if(desc.includes('不给分')||desc.includes('零分')||desc.includes('不给')){ if(bestScore===null) bestScore=0; continue; }
+    // 旧格式有规则但无明确分值：跳过，让智能评分处理
   }
-  return null;
+
+  return bestScore; // null = 无命中，让智能评分兜底
 }
+
 
 // 智能填空评分：逐空独立判断，语义相近即可给分
 // 评分规则：每空完全匹配或语义接近给全分，不给分则不给（无折中）
@@ -5172,8 +5373,14 @@ function openGrade(sid){
     fills.forEach((q,i)=>{
       const ua=sub.ans[gi]||'';
       const stored=sub.teacherScores[`f${gi}`]!==undefined?sub.teacherScores[`f${gi}`]:null;
-      const suggestFill=smartFillScore(q,ua);
-      html+=`<div style="padding:14px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:12px">
+      const customScore=checkCustomRule(q,ua);  // 优先：人工规则
+      const suggestFill=customScore!==null?customScore:smartFillScore(q,ua);
+      const isCustom=customScore!==null;
+      const ruleHint=isCustom
+        ?`<span class="badge" style="margin-left:4px;background:#7c3aed;color:#fff">📐 规则建议：${customScore}分</span>`
+        :(suggestFill>0?`<span class="badge b-green" style="margin-left:4px">✓ 智能建议：${suggestFill}分</span>`
+        :(ua?`<span class="badge b-red" style="margin-left:4px">✗ 智能建议：0分</span>`:''));
+      html+=`<div style="padding:14px;border:1.5px solid ${isCustom?'#7c3aed':'var(--border)'};border-radius:8px;margin-bottom:12px">
         <div class="fw7" style="margin-bottom:8px">第${i+1}题（${q.score}分）${esc(q.content)}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
           <div style="background:#f8fafc;padding:10px;border-radius:6px;font-size:13px"><div class="fc-muted mb2">考生答案</div>${ua?esc(ua):'<span class="fc-muted">未作答</span>'}</div>
@@ -5182,8 +5389,7 @@ function openGrade(sid){
         <div class="flex aic gap2 fs13">评分：
           <input type="number" id="gs_f${gi}" value="${stored!==null?stored:suggestFill}" min="0" max="${q.score}" style="width:70px">
           <span class="fc-muted">/ ${q.score}分</span>
-          ${stored===null&&suggestFill>0?'<span class="badge b-green" style="margin-left:4px">✓ 智能建议：'+suggestFill+'分</span>':''}
-          ${stored===null&&suggestFill===0&&ua?'<span class="badge b-red" style="margin-left:4px">✗ 智能建议：0分</span>':''}
+          ${stored===null?ruleHint:''}
         </div>
       </div>`;
       gi++;
@@ -5198,9 +5404,15 @@ function openGrade(sid){
       const kws=(q.keywords||'').split(',').map(k=>k.trim()).filter(Boolean);
       const hit=kws.filter(k=>ua.toLowerCase().includes(k.toLowerCase()));
       const miss=kws.filter(k=>!ua.toLowerCase().includes(k.toLowerCase()));
-      const autoS=smartEssayScore(q,ua);
+      const customScore=checkCustomRule(q,ua);  // 优先：人工规则
+      const autoS=customScore!==null?customScore:smartEssayScore(q,ua);
+      const isCustom=customScore!==null;
       const stored=sub.teacherScores[`e${gi}`]!==undefined?sub.teacherScores[`e${gi}`]:null;
-      html+=`<div style="padding:16px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:14px">
+      const ruleHint=isCustom
+        ?`<span class="badge" style="margin-left:4px;background:#7c3aed;color:#fff">📐 规则建议：${customScore}分</span>`
+        :(autoS>0?`<span class="badge b-green" style="margin-left:4px">✓ 智能建议：${autoS}分</span>`
+        :(ua?`<span class="badge b-yellow" style="margin-left:4px">? 智能建议：0分（请人工复核）</span>`:''));
+      html+=`<div style="padding:16px;border:1.5px solid ${isCustom?'#7c3aed':'var(--border)'};border-radius:8px;margin-bottom:14px">
         <div class="fw7" style="margin-bottom:10px">第${i+1}题（${q.score}分）${esc(q.content)}</div>
         <div style="margin-bottom:10px">
           <div class="fs13 fc-muted mb2">考生答案：</div>
@@ -5218,8 +5430,7 @@ function openGrade(sid){
         <div class="flex aic gap2 fs13">人工评分：
           <input type="number" id="gs_e${gi}" value="${stored!==null?stored:autoS}" min="0" max="${q.score}">
           <span class="fc-muted">/ ${q.score}分</span>
-          ${stored===null&&autoS>0?'<span class="badge b-green" style="margin-left:4px">✓ 智能建议：'+autoS+'分</span>':''}
-          ${stored===null&&autoS===0&&ua?'<span class="badge b-yellow" style="margin-left:4px">? 智能建议：0分（请人工复核）</span>':''}
+          ${stored===null?ruleHint:''}
         </div>
       </div>`;
       gi++;
