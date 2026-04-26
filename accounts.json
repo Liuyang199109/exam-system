@@ -1,129 +1,142 @@
 {
   "version": "1.0",
   "type": "accounts",
-  "exportedAt": "2026-04-16T10:11:27.393Z",
+  "exportedAt": "2026-04-26T08:38:33.901Z",
   "students": [
     {
       "id": "student001",
       "name": "张三",
       "pass": "123456",
       "examId": 1,
-      "dept": ""
+      "dept": "",
+      "creator": "admin"
     },
     {
       "id": "student002",
       "name": "李四",
       "pass": "123456",
       "examId": 1,
-      "dept": "BU2"
+      "dept": "",
+      "creator": "admin"
     },
     {
       "id": "laiph",
       "name": "赖品欢",
       "pass": "123456",
-      "dept": "人力资源部"
+      "dept": "人力资源部",
+      "creator": "admin"
     },
     {
       "id": "zhangl",
       "name": "张琳",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "ces",
       "name": "测试",
       "pass": "123456",
-      "dept": ""
+      "dept": "",
+      "creator": "admin"
     },
     {
       "id": "zhanght",
       "name": "张宏涛",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "wanghl",
       "name": "王华莉",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "yewq",
       "name": "叶伟青",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "zhangxy",
       "name": "张欣雨",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "huangqd",
       "name": "黄庆达",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "xiaozr",
       "name": "肖周锐",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "xiaox",
       "name": "肖鑫",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "shensx",
       "name": "沈帅先",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "lingm",
       "name": "林广铭",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "wangj",
       "name": "王健",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "zhaoqy",
       "name": "赵庆宇",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "wangyq",
       "name": "王英琪",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
       "id": "dilxt",
       "name": "迪力夏提",
       "pass": "123456",
-      "dept": "BU2"
+      "dept": "BU2",
+      "creator": "admin"
     },
     {
-      "id": "huangj",
+      "id": "haungj",
       "name": "黄静",
       "pass": "123456",
-      "dept": "BU2"
-    },
-    {
-      "id": "ces2",
-      "name": "测试2",
-      "pass": "123456",
-      "dept": ""
+      "dept": "BU2",
+      "creator": "admin"
     }
   ]
 }
