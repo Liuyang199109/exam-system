@@ -1,7 +1,7 @@
 {
   "version": "1.2",
   "type": "full-package",
-  "exportedAt": "2026-04-26T08:38:33.895Z",
+  "exportedAt": "2026-04-26T08:51:18.827Z",
   "students": [
     {
       "id": "student001",
@@ -1641,8 +1641,18 @@
       ],
       "tabCnt": 1,
       "submitAt": "16/04/2026, 00:07:23",
-      "finalScore": 113,
-      "teacherScores": {},
+      "finalScore": 120,
+      "teacherScores": {
+        "f23": 4,
+        "f24": 4,
+        "f25": 0,
+        "f26": 2,
+        "f27": 6,
+        "e28": 8,
+        "e29": 9,
+        "e30": 6,
+        "e31": 19
+      },
       "videoMeta": {
         "screenChunks": "local:1",
         "camChunks": "local:1",
