@@ -2020,9 +2020,29 @@ function _applyCloudData(data, forceRefresh){
   if(data.gradingRules && typeof data.gradingRules === 'object'){
     DB.gradingRules = data.gradingRules; updateCount++;
   }
-  // submissions：合并（保留本地阅卷数据）
+  // submissions：智能合并
+  // 规则：若 data.json 里的记录含人工评分(finalScore!=null)，则远端优先（更新了阅卷结果）；
+  //       否则本地优先（保留考生本地交卷数据，防止考生端提交被覆盖）
   if(data.submissions && typeof data.submissions === 'object'){
-    DB.submissions = {...data.submissions, ...(DB.submissions||{})};
+    const localSubs = DB.submissions || {};
+    const remoteSubs = data.submissions;
+    const merged = {...localSubs};
+    for(const [sid, remoteSub] of Object.entries(remoteSubs)){
+      const localSub = localSubs[sid];
+      if(!localSub){
+        // 本地无记录 → 直接用远端
+        merged[sid] = remoteSub;
+      } else {
+        // 两端都有：若远端有人工评分(finalScore!=null)，则远端优先（阅卷更新）
+        const remoteHasFinal = remoteSub.finalScore !== null && remoteSub.finalScore !== undefined;
+        if(remoteHasFinal){
+          // 保留远端（含最新 finalScore、autoTotal 等），但保留本地视频信息
+          merged[sid] = {...remoteSub, videoMeta: localSub.videoMeta || remoteSub.videoMeta};
+        }
+        // 否则保留本地（本地最新提交）
+      }
+    }
+    DB.submissions = merged;
     updateCount++;
   }
   if(Array.isArray(data.depts)) DB.depts = data.depts;
@@ -2282,14 +2302,24 @@ function renderStuExamList(){
         const essayTot = getObjTotal(sub.essayAutoScore);
         const autoTotal=sub.autoTotal??(sub.choiceScore||0+fillTot+essayTot);
         const finalScore=sub.finalScore;
-        const isFinal=finalScore!==null;
+        const isFinal=finalScore!==null && finalScore!==undefined;
+        // 判断是否有教师手动评分明细（有>0的教师分）
+        const hasTeacherDetail = sub.teacherScores && Object.values(sub.teacherScores).some(v=>v>0);
+        // 当有人工评分时，显示最终成绩徽章
+        const finalBadge = isFinal
+          ? `<div style="margin-top:8px;padding:8px 14px;background:linear-gradient(135deg,#16a34a,#15803d);border-radius:10px;text-align:center;color:#fff">
+              <span style="font-size:12px;opacity:0.8">人工复核最终成绩</span>
+              <div style="font-size:24px;font-weight:700">${finalScore}<span style="font-size:14px;opacity:0.8">分</span></div>
+              ${hasTeacherDetail?'<span style="font-size:11px;opacity:0.7">📖 点击「查看参考答案」可查看每题得分明细</span>':''}
+            </div>`
+          : '';
         scoreHtml=`<div class="stu-score-row">
           <div class="stu-score-item"><b>${autoTotal}</b>智能预估</div>
           <div class="stu-score-item"><b>${sub.choiceScore||0}</b>选择题</div>
           <div class="stu-score-item"><b>${fillTot}</b>填空题</div>
           <div class="stu-score-item"><b>${essayTot}</b>简答题</div>
           <div class="stu-score-item ${isFinal?'final':'pending'}"><b>${isFinal?finalScore+'分':'待复核'}</b>人工复核</div>
-        </div>`;
+        </div>${finalBadge}`;
       }
 
       // 参考答案（仅已结束考试显示）
@@ -2360,11 +2390,11 @@ function stuViewAnswers(examId){
   const sid=S.user?S.user.id:'';
   const sub=DB.submissions[sid];
   const userAns=(sub && String(sub.examId)===String(examId))?sub.ans:{};
-  openStuAnswerModal(exam,qs,userAns);
+  openStuAnswerModal(exam,qs,userAns,sub);
 }
 
-// 打开参考答案弹窗
-function openStuAnswerModal(exam,qs,userAns){
+// 打开参考答案弹窗（sub 可选，传入时显示每题得分）
+function openStuAnswerModal(exam,qs,userAns,sub){
   const existing=document.getElementById('m-stu-answers');
   if(existing) existing.remove();
   // 按与考试时相同顺序排列（选择题→填空题→简答题）
@@ -2373,6 +2403,37 @@ function openStuAnswerModal(exam,qs,userAns){
   const essays=qs.filter(q=>q.type==='essay');
   const orderedQs=[...choices,...fills,...essays]; // 全局顺序
   let html='';
+
+  // 是否有人工评分结果
+  const hasFinal = sub && sub.finalScore !== null && sub.finalScore !== undefined;
+  const hasTeacherScores = sub && sub.teacherScores && Object.keys(sub.teacherScores).length > 0;
+
+  // 辅助：生成得分徽章 HTML（填空/简答用）
+  function scoreTagHtml(gi, qType, qScore){
+    if(!sub) return '';
+    const key = qType==='fill' ? `f${gi}` : `e${gi}`;
+    const autoScoreObj = qType==='fill' ? sub.fillAutoScore : sub.essayAutoScore;
+    const autoS = autoScoreObj ? (typeof autoScoreObj === 'object' ? (autoScoreObj[key]??null) : null) : null;
+    const teacherS = sub.teacherScores ? (sub.teacherScores[key]??null) : null;
+    const finalS = (teacherS !== null && teacherS > 0) ? teacherS : (autoS !== null ? autoS : null);
+    if(autoS === null && teacherS === null) return '';
+    let html='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center">';
+    // 智能评分徽章
+    if(autoS !== null){
+      html+=`<span style="font-size:12px;padding:2px 8px;border-radius:10px;background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe">🤖 智能评分：${autoS}/${qScore}分</span>`;
+    }
+    // 教师评分徽章（有>0的教师分才显示）
+    if(teacherS !== null && teacherS > 0){
+      html+=`<span style="font-size:12px;padding:2px 8px;border-radius:10px;background:#f0fdf4;color:#16a34a;border:1px solid #86efac">👨‍🏫 教师评分：${teacherS}/${qScore}分</span>`;
+    }
+    // 最终得分
+    if(hasFinal && finalS !== null){
+      const color = finalS >= qScore ? '#16a34a' : (finalS > 0 ? '#d97706' : '#dc2626');
+      html+=`<span style="font-size:12px;padding:2px 8px;border-radius:10px;background:#fafafa;color:${color};border:1px solid #e5e7eb;font-weight:700">✅ 本题得分：${finalS}/${qScore}分</span>`;
+    }
+    html+='</div>';
+    return html;
+  }
 
   const renderSection=(title,list,startGi)=>{
     if(list.length===0) return '';
@@ -2398,6 +2459,7 @@ function openStuAnswerModal(exam,qs,userAns){
         const refAns=Array.isArray(q.answer)?q.answer.join(' | '):(q.answer||'');
         correctHtml=`<span class="stu-ans-ref">📌 参考答案：${esc(refAns)}</span>`;
         myHtml=myAns?`<span style="color:var(--txt)">📝 我的答案：${esc(myAns)}</span>`:'<span style="color:var(--muted)">（未作答）</span>';
+        myHtml += scoreTagHtml(gi, 'fill', q.score||0);
       } else {
         const refAns=q.answer||q.refAnswer||'';
         const kw=(q.keywords||'').split(',').map(k=>k.trim()).filter(Boolean);
@@ -2434,6 +2496,7 @@ function openStuAnswerModal(exam,qs,userAns){
         if(countScoreHtml){
           myHtml += countScoreHtml;
         }
+        myHtml += scoreTagHtml(gi, 'essay', q.score||0);
       }
       let optsHtml='';
       if(q.type==='choice'&&q.opts){
