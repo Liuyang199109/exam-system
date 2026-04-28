@@ -2461,7 +2461,7 @@ function openStuAnswerModal(exam,qs,userAns,sub){
         myHtml=myAns?`<span style="color:var(--txt)">📝 我的答案：${esc(myAns)}</span>`:'<span style="color:var(--muted)">（未作答）</span>';
         myHtml += scoreTagHtml(gi, 'fill', q.score||0);
       } else {
-        const refAns=q.answer||q.refAnswer||'';
+        const refAns=q.refAns||q.answer||q.refAnswer||'';
         const kw=(q.keywords||'').split(',').map(k=>k.trim()).filter(Boolean);
         const kwStr=kw.join('、');
         
