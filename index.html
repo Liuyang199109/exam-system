@@ -4302,7 +4302,7 @@ function doSubmit(){
   try { stopMonitor(); } catch(e) {}
 
   let result;
-  try { result = autoScore(); } catch(e) { result = {choiceScore:0, fillAutoScore:0, essayAutoScore:0, total:0, detail:{}}; }
+  try { result = autoScore(); } catch(e) { result = {choiceScore:0, fillAutoScore:0, essayAutoScore:0, fillScoreObj:{}, essayScoreObj:{}, total:0, detail:{}}; }
 
   // ★ 无论是否跨网络，只要有监控配置就提供导出入口（服务器上传成功时也可按需导出）
   const antiCheat = S.exam?.antiCheat || {};
@@ -4313,7 +4313,9 @@ function doSubmit(){
     stu:S.user, examId:S.exam.id, examName:S.exam.name,
     examStartTime:S.exam.startTime||null, examEndTime:S.exam.endTime||null, duration:S.exam.duration||null,
     ans:{...S.ans},
-    choiceScore:result.choiceScore, fillAutoScore:result.fillAutoScore, essayAutoScore:result.essayAutoScore,
+    choiceScore:result.choiceScore,
+    fillAutoScore: result.fillScoreObj || {},
+    essayAutoScore: result.essayScoreObj || {},
     autoTotal:result.total, autoDetail:result.detail,
     cheatLog:[...S.cheatLog], tabCnt:S.tabs,
     submitAt:new Date().toLocaleString(), finalScore:null, teacherScores:{},
@@ -4665,6 +4667,7 @@ function autoScore(){
   const essays=qs.filter(q=>q.type==='essay');
   let gi=0;
   let choiceScore=0,fillAutoScore=0,essayAutoScore=0;
+  const fillScoreObj={}, essayScoreObj={};
 
   choices.forEach(q=>{
     const userAns = S.ans[gi] || '';
@@ -4684,15 +4687,23 @@ function autoScore(){
     gi++;
   });
   fills.forEach(q=>{
-    fillAutoScore+=smartFillScore(q,S.ans[gi]||'');
+    const s=smartFillScore(q,S.ans[gi]||'');
+    fillScoreObj[`f${gi}`]=s;
+    fillAutoScore+=s;
     gi++;
   });
   essays.forEach(q=>{
-    essayAutoScore+=smartEssayScore(q,S.ans[gi]||'');
+    const s=smartEssayScore(q,S.ans[gi]||'');
+    essayScoreObj[`e${gi}`]=s;
+    essayAutoScore+=s;
     gi++;
   });
   return {
-    choiceScore,fillAutoScore,essayAutoScore,
+    choiceScore,
+    fillAutoScore,
+    essayAutoScore,
+    fillScoreObj,
+    essayScoreObj,
     total: choiceScore+fillAutoScore+essayAutoScore,
     detail: { choice:choiceScore, fill:fillAutoScore, essay:essayAutoScore }
   };
