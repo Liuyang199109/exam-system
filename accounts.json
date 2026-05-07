@@ -1,19 +1,11 @@
 {
   "version": "1.0",
   "type": "accounts",
-  "exportedAt": "2026-04-28T12:29:03.716Z",
+  "exportedAt": "2026-05-07T09:04:33.201Z",
   "students": [
     {
       "id": "student001",
       "name": "张三",
-      "pass": "123456",
-      "examId": 1,
-      "dept": "",
-      "creator": "admin"
-    },
-    {
-      "id": "student002",
-      "name": "李四",
       "pass": "123456",
       "examId": 1,
       "dept": "",
