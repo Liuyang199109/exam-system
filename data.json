@@ -1,7 +1,7 @@
 {
   "version": "1.2",
   "type": "full-package",
-  "exportedAt": "2026-05-07T09:04:33.189Z",
+  "exportedAt": "2026-05-07T09:32:14.487Z",
   "students": [
     {
       "id": "student001",
@@ -1784,6 +1784,9 @@
       "type": "choice",
       "content": "（不定项）下列可能实现微量气体的快速检测的分析技术有（ ）",
       "score": 5,
+      "examId": 1778143644709,
+      "isMultiple": true,
+      "creator": "admin",
       "opts": {
         "A": "近红外",
         "B": "拉曼",
@@ -1791,11 +1794,8 @@
         "D": "激光吸收光谱",
         "E": "光腔衰荡光谱"
       },
-      "answer": "ABDE",
-      "isMultiple": true,
-      "id": 1776175472932,
-      "examId": 1778143644709,
-      "creator": "admin"
+      "answer": "BDE",
+      "id": 1776175472932
     },
     {
       "type": "fill",

@@ -791,8 +791,9 @@ D.选项
         <div class="fg"><label>选项 B</label><input id="q-b" placeholder="选项B内容"></div>
         <div class="fg"><label>选项 C</label><input id="q-c" placeholder="选项C内容（可留空）"></div>
         <div class="fg"><label>选项 D</label><input id="q-d" placeholder="选项D内容（可留空）"></div>
+        <div class="fg"><label>选项 E</label><input id="q-e" placeholder="选项E内容（可留空）"></div>
         <div class="fg"><label>正确答案（单选）</label>
-          <select id="q-ans"><option>A</option><option>B</option><option>C</option><option>D</option></select>
+          <select id="q-ans"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select>
         </div>
       </div>
       <!-- 不定项（多选）字段 -->
@@ -801,8 +802,9 @@ D.选项
         <div class="fg"><label>选项 B</label><input id="q-mb" placeholder="选项B内容"></div>
         <div class="fg"><label>选项 C</label><input id="q-mc" placeholder="选项C内容（可留空）"></div>
         <div class="fg"><label>选项 D</label><input id="q-md" placeholder="选项D内容（可留空）"></div>
-        <div class="fg"><label>正确答案（多选，如：AB 或 ACD）</label>
-          <input id="q-mans" placeholder="如：AB 或 ACD，多个答案用英文逗号分隔，如：A,B">
+        <div class="fg"><label>选项 E</label><input id="q-me" placeholder="选项E内容（可留空）"></div>
+        <div class="fg"><label>正确答案（多选，如：ABE 或 A,C,E）</label>
+          <input id="q-mans" placeholder="如：ABE 或 A,C,E，多个答案用英文逗号分隔，如：A,B,E">
         </div>
       </div>
       <!-- 填空题字段 -->
@@ -2222,6 +2224,20 @@ async function doFetchFromServer(){
 // =====================================================
 //  考生主页：考试列表渲染
 // =====================================================
+
+/**
+ * 判断当前登录考生是否有权参加某场考试
+ * 规则：若考试设置了参考考生(studentIds非空数组)，仅名单内可见；
+ *       若未设置或为空，则所有考生均可参加（向后兼容）
+ */
+function isStudentAllowed(exam, studentId){
+  if(!exam) return false;
+  const ids = exam.studentIds;
+  if(!ids || !Array.isArray(ids) || ids.length === 0) return true; // 未设置→全员可参加
+  const sid = String(studentId || '');
+  return ids.some(id => String(id) === sid);
+}
+
 function renderStuExamList(){
   const availEl=document.getElementById('stu-avail-exams');
   const histEl=document.getElementById('stu-history-exams');
@@ -2230,10 +2246,13 @@ function renderStuExamList(){
   const now=new Date();
   const sid=S.user?S.user.id:'';
 
+  // 权限过滤：仅显示当前考生有权限参加的考试
+  const visibleExams = exams.filter(e => isStudentAllowed(e, sid));
+
   const availList=[];
   const histList=[];
 
-  exams.forEach(exam=>{
+  visibleExams.forEach(exam=>{
     const status=getExamStatus(exam);
     const sub=DB.submissions[sid];
     const submitted=sub && String(sub.examId)===String(exam.id);
@@ -2347,10 +2366,12 @@ function renderStuExamList(){
 function stuEnterExam(examId){
   const exam=getExamList().find(e=>e.id===examId||String(e.id)===String(examId));
   if(!exam){toast('考试不存在','err');return;}
+  // 权限检查：当前登录考生是否在参考名单中
+  const sid=S.user?S.user.id:'';
+  if(!isStudentAllowed(exam, sid)){toast('您未被授权参加此考试','err');return;}
   const now=new Date();
   if(exam.endTime && now>new Date(exam.endTime)){toast('该考试已结束','err');return;}
   if(exam.startTime && now<new Date(exam.startTime)){toast('该考试尚未开始，请于 '+exam.startTime+' 后再试','warn');return;}
-  const sid=S.user?S.user.id:'';
   if(DB.submissions[sid] && String(DB.submissions[sid].examId)===String(exam.id)){
     toast('您已完成此考试，请勿重复参加','warn');return;
   }
@@ -4057,7 +4078,7 @@ function renderExamQs(){
 }
 
 function renderChoice(q,gi,num){
-  const opts=['A','B','C','D'].filter(k=>q.opts&&q.opts[k]);
+  const opts=Object.keys(q.opts||{}).sort().filter(k=>q.opts[k]);
   const isMulti = q.isMultiple;
   const inpType = isMulti ? 'checkbox' : 'radio';
   const ansArr = S.ans[gi] ? S.ans[gi].split(',') : [];
@@ -6551,18 +6572,20 @@ function editQ(id){
   document.getElementById('q-score').value = q.score||5;
   if(q.type==='choice'){
     // 单选 和 不定项 共用 opts，两套输入框都填充（防止切换类型时另一套为空）
-    const A=q.opts?.A||'', B=q.opts?.B||'', C=q.opts?.C||'', D=q.opts?.D||'';
+    const A=q.opts?.A||'', B=q.opts?.B||'', C=q.opts?.C||'', D=q.opts?.D||'', E=q.opts?.E||'';
     // 单选字段
     document.getElementById('q-a').value=A;
     document.getElementById('q-b').value=B;
     document.getElementById('q-c').value=C;
     document.getElementById('q-d').value=D;
+    document.getElementById('q-e').value=E;
     document.getElementById('q-ans').value=(q.answer||'A').toString().charAt(0);
     // 不定项字段（同步填入，用户切换类型时不丢失选项）
     document.getElementById('q-ma').value=A;
     document.getElementById('q-mb').value=B;
     document.getElementById('q-mc').value=C;
     document.getElementById('q-md').value=D;
+    document.getElementById('q-me').value=E;
     document.getElementById('q-mans').value=q.isMultiple?(q.answer||''):'';
   } else if(q.type==='fill'){
     document.getElementById('q-fill-ans').value=Array.isArray(q.answer)?q.answer.join(','):q.answer||'';
@@ -6601,17 +6624,19 @@ function saveQ(){
     const A=v('q-a').trim(),B=v('q-b').trim();
     if(!A||!B){toast('请至少填写A、B选项','err');return;}
     q.opts={A,B};
-    const C=v('q-c').trim(),D=v('q-d').trim();
+    const C=v('q-c').trim(),D=v('q-d').trim(),Err=v('q-e').trim();
     if(C) q.opts.C=C;
     if(D) q.opts.D=D;
+    if(Err) q.opts.E=Err;
     q.answer=v('q-ans');
   } else if(formType==='multi'){
     const A=v('q-ma').trim(),B=v('q-mb').trim();
     if(!A||!B){toast('请至少填写A、B选项','err');return;}
     q.opts={A,B};
-    const C=v('q-mc').trim(),D=v('q-md').trim();
+    const C=v('q-mc').trim(),D=v('q-md').trim(),Err=v('q-me').trim();
     if(C) q.opts.C=C;
     if(D) q.opts.D=D;
+    if(Err) q.opts.E=Err;
     q.answer=v('q-mans').trim().toUpperCase().replace(/,\s*/g,',');
     if(!q.answer){toast('请输入正确答案','err');return;}
   } else if(formType==='fill'){
@@ -6864,7 +6889,7 @@ function doParse(){
     <div style="padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
       <div class="flex aic gap2 mb2"><span class="badge ${cl[q.type]}">${tl[q.type]}</span><span class="fs13 fc-muted">第${i+1}题 · <b style="color:var(--pri)">${q.score}分</b>${q._perBlank?`（每空${q._perBlank}分）`:''}</span></div>
       <div style="font-size:14px">${esc(q.content)}</div>
-      ${q.type==='choice'?`<div class="fs13 fc-muted mt2">${['A','B','C','D'].filter(k=>q.opts&&q.opts[k]).map(k=>`${k}.${esc(q.opts[k])}`).join(' | ')} <b>→答案:${q.answer}</b></div>`:''}
+      ${q.type==='choice'?`<div class="fs13 fc-muted mt2">${Object.keys(q.opts||{}).sort().filter(k=>q.opts[k]).map(k=>`${k}.${esc(q.opts[k])}`).join(' | ')} <b>→答案:${q.answer}</b></div>`:''}
       ${q.type==='fill'?`<div class="fs13 fc-muted mt2">答案: ${esc(q.answer)}</div>`:''}
       ${q.type==='essay'?`<div class="fs13 fc-muted mt2">得分点: ${esc(q.keywords||'')}</div>`:''}
     </div>`).join('');
@@ -7046,6 +7071,7 @@ function parseTxt(txt){
             else if(/^B[.．、:\s]/.test(l)) q.opts.B=l.replace(/^B[.．、:\s]*/,'').trim();
             else if(/^C[.．、:\s]/.test(l)) q.opts.C=l.replace(/^C[.．、:\s]*/,'').trim();
             else if(/^D[.．、:\s]/.test(l)) q.opts.D=l.replace(/^D[.．、:\s]*/,'').trim();
+            else if(/^E[.．、:\s]/.test(l)) q.opts.E=l.replace(/^E[.．、:\s]*/,'').trim();
             else if(/^分值[：:]/.test(l)) q.score=parseInt(l.replace(/^分值[：:]/,''))||5;
           });
         } else if(type==='fill'){
@@ -7466,7 +7492,7 @@ function openPreviewModal(exam, qs){
 }
 
 function renderPreviewChoice(q, gi, num){
-  const opts=['A','B','C','D'].filter(k=>q.opts&&q.opts[k]);
+  const opts=Object.keys(q.opts||{}).sort().filter(k=>q.opts[k]);
   const typeTag = q.isMultiple ? '<span style="font-size:11px;color:var(--err);background:#fef2f2;padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600">多选</span>' : '';
   return `<div class="q-card" id="pqc${gi}">
     <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${esc(q.content)}${typeTag}</span></div>
