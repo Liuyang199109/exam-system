@@ -128,7 +128,7 @@ tr:last-child td{border-bottom:none}tr:hover td{background:#f8fafc}
 .modal-close:hover{background:var(--bg)}
 .modal-bd{padding:22px 26px}.modal-ft{padding:12px 20px 16px;display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--border)}.modal-ft .btn{white-space:nowrap}.modal-ft .btn-sec{min-width:80px;flex-shrink:0}.modal-ft .btn-pri{flex:1;max-width:200px}.card-hd .btn-pri{width:auto;padding:5px 14px}
 /* 弹窗拖拽调节大小 */
-.modal{position:relative;overflow:visible;min-width:300px;min-height:200px}
+.modal{position:relative;overflow-y:auto;min-width:300px;min-height:200px}
 .modal-resize-handle{position:absolute;bottom:0;right:0;width:20px;height:20px;cursor:nwse-resize;z-index:10;background:linear-gradient(135deg,transparent 50%,rgba(0,0,0,.12) 50%);border-radius:0 0 16px 0;transition:background .2s}
 .modal-resize-handle:hover{background:linear-gradient(135deg,transparent 50%,rgba(37,99,235,.4) 50%)}
 .modal-bd-resizable{min-height:100px;overflow:auto}
@@ -1582,7 +1582,47 @@ function _migrateCompatFields(){
   addCreator(EXAM_LIST.list, 'admin');
   addCreator(DB.questions, 'admin');
   addCreator(DB.students, 'admin');
+  // ★ 答卷键名迁移：旧格式 {studentId: submission} → 新格式 {studentId_examId: submission}
+  if(DB.submissions && typeof DB.submissions === 'object'){
+    const migrated = {};
+    let needsMigration = false;
+    for(const [key, sub] of Object.entries(DB.submissions)){
+      if(!sub || typeof sub !== 'object') continue;
+      // 旧格式键 = 纯 studentId（不含下划线），新格式 = studentId_examId（含下划线）
+      if(sub.examId && !key.includes('_')){
+        const newKey = subKey(key, sub.examId);
+        migrated[newKey] = sub;
+        needsMigration = true;
+      } else {
+        migrated[key] = sub; // 已迁移的保持
+      }
+    }
+    if(needsMigration){
+      DB.submissions = migrated;
+      changed = true;
+    }
+  }
   return changed;
+}
+
+// =====================================================
+//  答卷键名：studentId_examId（支持同一考生多次考试）
+// =====================================================
+function subKey(sid, eid){ return (sid||'') + '_' + (eid||''); }
+
+// 向后兼容：通过 studentId + examId 查找答卷，也兼容旧格式（纯 studentId 键）
+function getSub(sid, eid){
+  const sk = subKey(sid, eid);
+  if(DB.submissions[sk]) return DB.submissions[sk];
+  // 向后兼容旧格式：studentId 直接作为键
+  const oldSub = DB.submissions[sid];
+  if(oldSub && String(oldSub.examId) === String(eid)) return oldSub;
+  return null;
+}
+
+// 向后兼容：通过旧键或新键获取答卷对象
+function getSubByKey(key){
+  return DB.submissions[key] || null;
 }
 
 // DB 对象（Proxy 实现：读写自动同步 localStorage + 服务端）
@@ -2022,26 +2062,31 @@ function _applyCloudData(data, forceRefresh){
   if(data.gradingRules && typeof data.gradingRules === 'object'){
     DB.gradingRules = data.gradingRules; updateCount++;
   }
-  // submissions：智能合并
+  // submissions：智能合并（支持新旧格式兼容）
   // 规则：若 data.json 里的记录含人工评分(finalScore!=null)，则远端优先（更新了阅卷结果）；
   //       否则本地优先（保留考生本地交卷数据，防止考生端提交被覆盖）
   if(data.submissions && typeof data.submissions === 'object'){
     const localSubs = DB.submissions || {};
-    const remoteSubs = data.submissions;
-    const merged = {...localSubs};
-    for(const [sid, remoteSub] of Object.entries(remoteSubs)){
-      const localSub = localSubs[sid];
-      if(!localSub){
-        // 本地无记录 → 直接用远端
-        merged[sid] = remoteSub;
+    // 标准化远端数据：旧格式 {studentId: sub} → 新格式 {studentId_examId: sub}
+    const remoteSubs = {};
+    for(const [key, sub] of Object.entries(data.submissions)){
+      if(!sub || typeof sub !== 'object') continue;
+      if(sub.examId && !key.includes('_')){
+        remoteSubs[subKey(key, sub.examId)] = sub;
       } else {
-        // 两端都有：若远端有人工评分(finalScore!=null)，则远端优先（阅卷更新）
+        remoteSubs[key] = sub;
+      }
+    }
+    const merged = {...localSubs};
+    for(const [sk, remoteSub] of Object.entries(remoteSubs)){
+      const localSub = localSubs[sk];
+      if(!localSub){
+        merged[sk] = remoteSub;
+      } else {
         const remoteHasFinal = remoteSub.finalScore !== null && remoteSub.finalScore !== undefined;
         if(remoteHasFinal){
-          // 保留远端（含最新 finalScore、autoTotal 等），但保留本地视频信息
-          merged[sid] = {...remoteSub, videoMeta: localSub.videoMeta || remoteSub.videoMeta};
+          merged[sk] = {...remoteSub, videoMeta: localSub.videoMeta || remoteSub.videoMeta};
         }
-        // 否则保留本地（本地最新提交）
       }
     }
     DB.submissions = merged;
@@ -2254,8 +2299,9 @@ function renderStuExamList(){
 
   visibleExams.forEach(exam=>{
     const status=getExamStatus(exam);
-    const sub=DB.submissions[sid];
-    const submitted=sub && String(sub.examId)===String(exam.id);
+    const sk = subKey(sid, exam.id);
+    const sub=DB.submissions[sk];
+    const submitted=!!sub;
     if(submitted || status==='ended'){
       histList.push({exam, sub:submitted?sub:null, status});
     } else {
@@ -2372,9 +2418,8 @@ function stuEnterExam(examId){
   const now=new Date();
   if(exam.endTime && now>new Date(exam.endTime)){toast('该考试已结束','err');return;}
   if(exam.startTime && now<new Date(exam.startTime)){toast('该考试尚未开始，请于 '+exam.startTime+' 后再试','warn');return;}
-  if(DB.submissions[sid] && String(DB.submissions[sid].examId)===String(exam.id)){
-    toast('您已完成此考试，请勿重复参加','warn');return;
-  }
+  const sk = subKey(sid, exam.id);
+  if(DB.submissions[sk]){toast('您已完成此考试，请勿重复参加','warn');return;}
   S.exam={
     id:exam.id,
     name:exam.name,
@@ -2409,7 +2454,8 @@ function stuViewAnswers(examId){
   const qs=DB.questions.filter(q=>String(q.examId)===String(examId));
   if(qs.length===0){toast('该考试暂无题目信息','warn');return;}
   const sid=S.user?S.user.id:'';
-  const sub=DB.submissions[sid];
+  const sk = subKey(sid, examId);
+  const sub=DB.submissions[sk];
   const userAns=(sub && String(sub.examId)===String(examId))?sub.ans:{};
   openStuAnswerModal(exam,qs,userAns,sub);
 }
@@ -4330,11 +4376,14 @@ function doSubmit(){
   const hadMonitoring = antiCheat.rec || antiCheat.cam || hasLocalScr || hasLocalCam;
 
   const subs=DB.submissions;
-  subs[S.user.id]={
+  const sk = subKey(S.user.id, S.exam.id);
+  subs[sk]={
+    stu:S.user, examId:S.exam.id, examName:S.exam.name,
     stu:S.user, examId:S.exam.id, examName:S.exam.name,
     examStartTime:S.exam.startTime||null, examEndTime:S.exam.endTime||null, duration:S.exam.duration||null,
     ans:{...S.ans},
     choiceScore:result.choiceScore,
+    // fillScoreObj/essayScoreObj 存入 fillAutoScore/essayAutoScore，供 scoreTagHtml 读取每题明细
     fillAutoScore: result.fillScoreObj || {},
     essayAutoScore: result.essayScoreObj || {},
     autoTotal:result.total, autoDetail:result.detail,
@@ -4415,7 +4464,8 @@ function doSubmit(){
 
 // 导出考生答卷+视频（跨网络场景）
 function exportStudentSubmission(){
-  const sub = DB.submissions[S.user.id];
+  const sk = subKey(S.user.id, S.exam.id);
+  const sub = DB.submissions[sk];
   if(!sub){ toast('未找到交卷记录','err'); return; }
 
   const scrChunks = S.scrLocalChunks.filter(Boolean);
@@ -4484,8 +4534,9 @@ function exportStudentSubmission(){
 function exportStuHistoryRecord(examId){
   if(!S.user){ toast('请先登录','err'); return; }
   const sid = S.user.id;
-  const sub = DB.submissions[sid];
-  if(!sub || String(sub.examId) !== String(examId)){ toast('未找到该考试的交卷记录','err'); return; }
+  const sk = subKey(sid, examId);
+  const sub = DB.submissions[sk];
+  if(!sub){ toast('未找到该考试的交卷记录','err'); return; }
 
   // 判断内存中是否还有视频（刚交卷且未退出页面）
   const scrChunks = (S.scrLocalChunks||[]).filter(Boolean);
@@ -4721,10 +4772,10 @@ function autoScore(){
   });
   return {
     choiceScore,
-    fillAutoScore,
-    essayAutoScore,
-    fillScoreObj,
-    essayScoreObj,
+    fillAutoScore,        // 总分（数字）
+    essayAutoScore,      // 总分（数字）
+    fillScoreObj,        // 每题得分 {f0:2, f1:5}
+    essayScoreObj,       // 每题得分 {e0:3, e1:8}
     total: choiceScore+fillAutoScore+essayAutoScore,
     detail: { choice:choiceScore, fill:fillAutoScore, essay:essayAutoScore }
   };
@@ -8434,7 +8485,7 @@ function updateBatchBtn(){
 
 // 删除单条答卷
 function deleteSubmission(sid){
-  const s=DB.submissions[sid];
+  const s=getSubByKey(sid);
   if(!s){ toast('未找到该答卷记录','err'); return; }
   const name=s.stu?.name||sid;
   const exam=s.examName||'';
@@ -8451,7 +8502,7 @@ function batchDeleteSubmissions(){
   const cks=[...document.querySelectorAll('.sub-row-ck:checked')];
   if(cks.length===0){ toast('请先选择要删除的答卷','warn'); return; }
   const names=cks.map(c=>{
-    const s=DB.submissions[c.dataset.sid];
+    const s=getSubByKey(c.dataset.sid);
     return s?(s.stu?.name||c.dataset.sid):c.dataset.sid;
   });
   if(!confirm(`确定要删除以下 ${cks.length} 份答卷吗？\n\n${names.slice(0,5).map(n=>'· '+n).join('\n')}${names.length>5?'\n…还有 '+(names.length-5)+' 份':''}\n\n此操作不可恢复！`)) return;
@@ -8475,7 +8526,7 @@ function gradeTableClick(e){
 
 // 允许考生重考（清除该考生对某考试的答卷记录）
 function allowRetake(sid){
-  const sub = DB.submissions[sid];
+  const sub = getSubByKey(sid);
   if(!sub){
     toast('❌ 未找到答卷记录','err');
     return;
@@ -8492,8 +8543,7 @@ function allowRetake(sid){
 }
 
 function openGrade(sid){
-  const subs=DB.submissions;
-  const sub=subs[sid];
+  const sub=getSubByKey(sid);
   if(!sub){
     toast('❌ 未找到答卷数据，可能是导入的数据格式有问题','err');
     console.error('阅卷失败 - sid:', sid, 'sub:', sub, 'DB.submissions keys:', Object.keys(subs));
@@ -8690,8 +8740,7 @@ function parseLetters(str){
 }
 
 function submitGrade(){
-  const subs=DB.submissions;
-  const sub=subs[S.gradingStu];
+  const sub=getSubByKey(S.gradingStu);
   if(!sub) return;
   const curId = sub.examId;
   const qs=DB.questions.filter(q=>{
