@@ -2687,12 +2687,64 @@ function openStuAnswerModal(exam,qs,userAns,sub){
   const modalDiv=document.createElement('div');
   modalDiv.className='overlay';
   modalDiv.id='m-stu-answers';
-  modalDiv.innerHTML=`<div class="modal modal-lg" style="max-height:90vh;display:flex;flex-direction:column">
-    <div class="modal-hd"><h3>📖 参考答案 — ${esc(exam.name)}</h3><button class="modal-close" onclick="document.getElementById('m-stu-answers').remove()">✕</button></div>
-    <div class="modal-bd" style="overflow-y:auto;flex:1">${html}</div>
+  modalDiv.innerHTML=`<div class="modal modal-lg" id="m-stu-answers-modal" style="width:92vw;max-width:1400px;max-height:92vh;display:flex;flex-direction:column;resize:both;overflow:auto;min-width:400px;min-height:300px">
+    <div class="modal-hd" style="cursor:move" id="m-stu-answers-hd">
+      <h3>📖 参考答案 — ${esc(exam.name)}</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sec btn-sm" onclick="toggleAnswerFullscreen()" title="切换全屏">⛶ 全屏</button>
+        <button class="modal-close" onclick="document.getElementById('m-stu-answers').remove()">✕</button>
+      </div>
+    </div>
+    <div class="modal-bd" style="overflow-y:auto;flex:1;min-height:200px">${html}</div>
     <div class="modal-ft"><button class="btn btn-pri" onclick="document.getElementById('m-stu-answers').remove()">关闭</button></div>
   </div>`;
   document.body.appendChild(modalDiv);
+  
+  // 使弹窗可拖拽
+  setTimeout(() => {
+    const modal = document.getElementById('m-stu-answers-modal');
+    const header = document.getElementById('m-stu-answers-hd');
+    if(!modal || !header) return;
+    let isDragging = false, startX, startY, startLeft, startTop;
+    header.onmousedown = (e) => {
+      if(e.target.closest('button')) return; // 不拦截按钮
+      isDragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startLeft = modal.offsetLeft; startTop = modal.offsetTop;
+    };
+    document.addEventListener('mousemove', (e) => {
+      if(!isDragging) return;
+      modal.style.left = (startLeft + e.clientX - startX) + 'px';
+      modal.style.top = (startTop + e.clientY - startY) + 'px';
+      modal.style.position = 'relative';
+      modal.style.margin = '0';
+    });
+    document.addEventListener('mouseup', () => { isDragging = false; });
+  }, 100);
+}
+
+// 参考答案弹窗全屏切换
+function toggleAnswerFullscreen(){
+  const modal = document.getElementById('m-stu-answers-modal');
+  if(!modal) return;
+  if(modal._fullscreen){
+    // 退出全屏
+    Object.assign(modal.style, modal._prevStyle);
+    modal._fullscreen = false;
+  } else {
+    // 进入全屏
+    modal._prevStyle = {
+      width: modal.style.width, maxWidth: modal.style.maxWidth,
+      maxHeight: modal.style.maxHeight, left: modal.style.left,
+      top: modal.style.top, position: modal.style.position,
+      margin: modal.style.margin, borderRadius: modal.style.borderRadius,
+    };
+    Object.assign(modal.style, {
+      width:'100vw', maxWidth:'100vw', maxHeight:'100vh',
+      left:'0', top:'0', position:'fixed', margin:'0', borderRadius:'0',
+    });
+    modal._fullscreen = true;
+  }
 }
 
 function loginAdmin(){
@@ -2752,13 +2804,7 @@ function _checkVideoExport(action){
   const rp = document.getElementById('pg-result');
   if(!rp || rp.style.display !== 'flex') return false;
   const actionText = action || '进行操作';
-  const stay = confirm('⚠️ 您还未导出录屏和摄像头视频！
-
-离开此页面后，视频将在本地保留7天，超期将被清除。
-建议立即导出。
-
-点击「确定」：留在当前页面导出视频
-点击「取消」：继续' + actionText);
+  const stay = confirm('⚠️ 您还未导出录屏和摄像头视频！\n\n离开此页面后，视频将在本地保留7天，超期将被清除。\n建议立即导出。\n\n点击「确定」：留在当前页面导出视频\n点击「取消」：继续' + actionText);
   return stay;
 }
 
