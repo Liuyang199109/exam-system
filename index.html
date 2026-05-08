@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- 评分规则诊断：2026-04-19 更新版，修复了关键词模糊匹配、AND/OR关系、标签变体识别、中文标签与数字序号自动映射 -->
 <!-- 如需诊断，请在控制台输入: diagnoseGrading() 并按回车 -->
-<script>window._gradingVersion='20260508-v26'; window._debugGrading=true;</script>
+<script>window._gradingVersion='20260508-v28'; window._debugGrading=true;</script>
 <title>在线考试监考系统</title>
 <script>
 // ─── 控制台诊断命令 ───────────────────────────────────────────
@@ -2303,6 +2303,57 @@ async function doFetchFromServer(){
 //  考生主页：考试列表渲染
 // =====================================================
 
+// 考生端：刷新单个历史考试的智能评分（用最新规则）
+async function recalcStuScore(examId){
+  const sid = S.user ? S.user.id : '';
+  const sk = subKey(sid, examId);
+  const sub = DB.submissions[sk];
+  if (!sub) { toast('未找到答卷记录', 'err'); return; }
+  
+  // 确保评分规则已加载
+  if (!_fullDataLoaded || !DB.gradingRules || Object.keys(DB.gradingRules).length === 0) {
+    try { await autoLoadFullData(true); } catch(e) {}
+  }
+  
+  const exam = getExamList().find(e => String(e.id) === String(examId));
+  const oldAns = S.ans;
+  const oldExam = S.exam;
+  
+  S.ans = sub.ans || {};
+  S.exam = { id: examId, name: exam ? exam.name : '' };
+  
+  let result;
+  try {
+    result = autoScore();
+  } catch(e) {
+    console.error('评分重新计算失败:', e);
+    result = null;
+  }
+  
+  S.ans = oldAns;
+  S.exam = oldExam;
+  
+  if (!result) { toast('评分重新计算失败', 'err'); return; }
+  
+  // 更新提交记录中的智能评分（不覆盖教师评分）
+  sub.choiceScore = result.choiceScore;
+  sub.fillAutoScore = result.fillScoreObj || {};
+  sub.essayAutoScore = result.essayScoreObj || {};
+  sub.autoTotal = result.total;
+  sub.autoDetail = result.detail;
+  sub.recalculatedAt = new Date().toISOString();
+  
+  // 如果没有教师评分，也更新 finalScore
+  const hasTeacherScore = sub.teacherScores && Object.keys(sub.teacherScores).some(k => sub.teacherScores[k] > 0);
+  if (!hasTeacherScore) {
+    sub.finalScore = result.total;
+  }
+  
+  DB.submissions = DB.submissions;
+  renderStuExamList();
+  toast('✅ 智能评分已刷新！新分数：' + result.total + '分', 'ok');
+}
+
 /**
  * 判断当前登录考生是否有权参加某场考试
  * 规则：若考试设置了参考考生(studentIds非空数组)，仅名单内可见；
@@ -2426,6 +2477,10 @@ function renderStuExamList(){
 
       // ★ 导出答卷按钮（仅已提交的考试显示）
       const exportBtn=submitted?`<button class="btn btn-warn btn-sm" onclick="exportStuHistoryRecord('${exam.id}')">📦 导出答卷+视频</button>`:'';
+      
+      // 刷新评分按钮（仅已提交且无教师评分的考试显示）
+      const hasTeacher = sub && sub.teacherScores && Object.values(sub.teacherScores).some(v=>v>0);
+      const recalcBtn=submitted?`<button class="btn btn-sec btn-sm" onclick="recalcStuScore('${exam.id}')" title="用最新评分规则重新计算智能评分">🔄 刷新评分</button>`:'';
 
       return `<div class="stu-exam-card">
         <div class="stu-exam-card-hd">
@@ -2433,7 +2488,7 @@ function renderStuExamList(){
             <div class="stu-exam-name">${esc(exam.name)}</div>
             <div class="stu-exam-meta">${statusBadge}${exam.endTime?`<span>截止：${exam.endTime}</span>`:''}</div>
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">${exportBtn}${ansBtn}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${recalcBtn}${exportBtn}${ansBtn}</div>
         </div>
         ${scoreHtml}
       </div>`;
@@ -2442,7 +2497,17 @@ function renderStuExamList(){
 }
 
 // 考生进入考试
-function stuEnterExam(examId){
+async function stuEnterExam(examId){
+  // 确保评分规则已加载
+  if(!_fullDataLoaded || !DB.gradingRules || Object.keys(DB.gradingRules).length === 0){
+    toast('⏳ 正在加载评分规则，请稍候...', 'info');
+    try {
+      await autoLoadFullData(true);
+    } catch(e) {
+      console.warn('评分规则加载失败，将使用默认评分:', e);
+    }
+  }
+  
   const exam=getExamList().find(e=>e.id===examId||String(e.id)===String(examId));
   if(!exam){toast('考试不存在','err');return;}
   // 权限检查：当前登录考生是否在参考名单中
@@ -2482,6 +2547,7 @@ function stuEnterExam(examId){
 
 // 考生查看参考答案
 function stuViewAnswers(examId){
+  if(_checkVideoExport('查看参考答案')) return;
   const exam=getExamList().find(e=>e.id===examId||String(e.id)===String(examId));
   if(!exam){toast('考试不存在','err');return;}
   const qs=DB.questions.filter(q=>String(q.examId)===String(examId));
@@ -2656,6 +2722,7 @@ function loginAdmin(){
 }
 
 function logout(){
+  if(_checkVideoExport('退出登录')) return;
   try{stopMonitor();}catch(e){}
   try{clearInterval(S.timerH);}catch(e){}
   localStorage.removeItem('session');
@@ -2679,7 +2746,24 @@ function logout(){
 }
 
 // 考生返回主页（考试列表）
+// 公共函数：检查是否在结果页且未导出视频
+function _checkVideoExport(action){
+  if(!window._hasLocalVideo || window._videoExported) return false;
+  const rp = document.getElementById('pg-result');
+  if(!rp || rp.style.display !== 'flex') return false;
+  const actionText = action || '进行操作';
+  const stay = confirm('⚠️ 您还未导出录屏和摄像头视频！
+
+离开此页面后，视频将在本地保留7天，超期将被清除。
+建议立即导出。
+
+点击「确定」：留在当前页面导出视频
+点击「取消」：继续' + actionText);
+  return stay;
+}
+
 function goStuHome(){
+  if(_checkVideoExport('返回考试列表')) return;
   // 停止所有监控（以防万一）
   try{stopMonitor();}catch(e){}
   document.getElementById('monitor-bar').style.display='none';
@@ -2690,6 +2774,7 @@ function goStuHome(){
 
 // 修改密码（管理员/考生通用）
 function openChangePwd(){
+  if(_checkVideoExport('修改密码')) return;
   document.getElementById('cp-old').value = '';
   document.getElementById('cp-new').value = '';
   document.getElementById('cp-new2').value = '';
@@ -4399,6 +4484,24 @@ function doSubmit(){
     flushRec(S.camRecorder, 'cam');
   } catch(e) {}
 
+
+  // ★ 持久化视频到 IndexedDB（1周有效期，防止忘记导出）
+  if(hasLocalVideo){
+    const metaKey = subKey(S.user.id, S.exam.id);
+    const expiresAt = Date.now() + 7*24*60*60*1000;
+    try {
+      openIDB().then(() => {
+        const screenBlobs = S.scrLocalChunks.filter(Boolean);
+        const camBlobs = S.camLocalChunks.filter(Boolean);
+        let saveCount = 0;
+        const checkDone = () => { saveCount++; if(saveCount >= screenBlobs.length + camBlobs.length) idbPut('meta',{metaKey,studentId:S.user.id,examId:S.exam.id,examName:S.exam.name,screenCount:screenBlobs.length,camCount:camBlobs.length,expiresAt})};
+        screenBlobs.forEach((blob,i)=>{blob.arrayBuffer().then(buf=>{idbPut('videos',{key:metaKey+'_screen_'+i,studentId:S.user.id,examId:S.exam.id,type:'screen',idx:i,data:buf,expiresAt});checkDone()}).catch(()=>checkDone())});
+        camBlobs.forEach((blob,i)=>{blob.arrayBuffer().then(buf=>{idbPut('videos',{key:metaKey+'_cam_'+i,studentId:S.user.id,examId:S.exam.id,type:'cam',idx:i,data:buf,expiresAt});checkDone()}).catch(()=>checkDone())});
+      }).catch(()=>{});
+    }catch(e){console.warn('视频持久化失败:',e)}
+  }
+
+
   try { stopMonitor(); } catch(e) {}
 
   let result;
@@ -4490,6 +4593,9 @@ function doSubmit(){
   document.getElementById('monitor-bar').style.display='none';
   document.getElementById('cam-wrap').style.display='none';
   document.getElementById('cam-prev').style.display='none';
+  // 设置视频导出标志（用于退出确认）
+  window._hasLocalVideo = hasLocalVideo;
+  window._videoExported = false;
   try{ showPage('pg-result'); }catch(e){}
   try{ refreshStats(); }catch(e){}
 }
@@ -4497,6 +4603,7 @@ function doSubmit(){
 
 // 导出考生答卷+视频（跨网络场景）
 function exportStudentSubmission(){
+  window._videoExported = true;
   const sk = subKey(S.user.id, S.exam.id);
   const sub = DB.submissions[sk];
   if(!sub){ toast('未找到交卷记录','err'); return; }
@@ -4565,6 +4672,7 @@ function exportStudentSubmission(){
 // 与 exportStudentSubmission 的区别：不依赖 S.exam，支持事后随时导出
 // 如果当前会话中仍有内存视频（刚交卷未离开页面）则同时导出视频；否则仅导出答卷JSON
 function exportStuHistoryRecord(examId){
+  window._videoExported = true;
   if(!S.user){ toast('请先登录','err'); return; }
   const sid = S.user.id;
   const sk = subKey(sid, examId);
