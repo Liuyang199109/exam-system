@@ -667,6 +667,7 @@ D.选项
       <span id="stu-sync-msg" style="font-size:13px;color:#166534;flex:1">⏳ 正在检查服务器数据...</span>
       <button class="btn btn-sm" style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0" onclick="forceReloadData()" title="强制从服务器重新拉取最新考试数据">🔄 强制刷新</button>
       <label class="btn btn-sec btn-sm" style="cursor:pointer;border:1px solid #bbf7d0;background:#dcfce7;color:#166534">📥 手动导入<input type="file" accept=".json" style="display:none" onchange="importDataFile(event,true)"></label>
+      <label class="btn btn-sec btn-sm" style="cursor:pointer;border:1px solid #e9d5ff;background:#f3e8ff;color:#7c3aed" title="导入之前导出的答案文件以恢复答卷记录">📥 导入我的答卷<input type="file" accept=".json" style="display:none" onchange="importMyAnswerFile(event)"></label>
     </div>
     <!-- 可参加的考试 -->
     <div class="stu-section-title">🚀 <span>可参加的考试</span></div>
@@ -10653,6 +10654,67 @@ function downloadJSON(data, prefix){
   a.click();
   URL.revokeObjectURL(url);
   toast('考试数据已导出','ok');
+}
+
+function importMyAnswerFile(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      const data = JSON.parse(e.target.result);
+      let examId, studentId, submission;
+      // 兼容多种导出格式
+      if(data.type === 'student-submission'){
+        ({ examId, studentId, submission } = data);
+      } else if(data.type === 'student-answer-export'){
+        studentId = data.studentId; examId = data.examId;
+        submission = {
+          examId, examName: data.examName,
+          stu: { id: studentId, name: data.studentName },
+          ans: data.answers || {},
+          choiceScore: data.scores?.choiceScore || 0,
+          fillAutoScore: data.scores?.fillAutoScore || 0,
+          essayAutoScore: data.scores?.essayAutoScore || 0,
+          autoTotal: data.scores?.autoTotal || 0,
+          finalScore: null, teacherScores: {},
+          submitAt: data.submitAt,
+          cheatLog: [], tabCnt: 0
+        };
+      } else {
+        toast('❌ 无法识别文件格式，请使用之前导出的答卷文件','err'); return;
+      }
+      if(!studentId || !examId || !submission){
+        toast('❌ 文件中缺少考生ID或考试ID','err'); return;
+      }
+      const sk = subKey(studentId, examId);
+      const allSubs = DB.submissions;
+      if(!allSubs[sk]){
+        allSubs[sk] = submission;
+        DB.submissions = allSubs;
+        toast(`✅ 答卷已恢复！考试「${submission.examName||examId}」`, 'ok');
+      } else {
+        const oldSub = allSubs[sk];
+        const oldTime = oldSub.submitAt ? new Date(oldSub.submitAt) : null;
+        const newTime = submission.submitAt ? new Date(submission.submitAt) : null;
+        if(!newTime || (oldTime && oldTime >= newTime)){
+          toast(`该考试的答卷记录已存在，无需覆盖`, 'info'); return;
+        }
+        if(oldSub.finalScore !== null && oldSub.finalScore !== undefined){
+          submission.finalScore = oldSub.finalScore;
+          submission.teacherScores = oldSub.teacherScores || {};
+        }
+        allSubs[sk] = submission;
+        DB.submissions = allSubs;
+        toast(`✅ 答卷已更新！考试「${submission.examName||examId}」`, 'ok');
+      }
+      if(S.role==='examinee') renderStuExamList();
+    } catch(err){
+      toast('❌ 导入失败：' + (err.message||'文件格式错误'),'err');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 function importDataFile(event, fromStuPage){
