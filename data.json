@@ -1,7 +1,7 @@
 {
   "version": "1.2",
   "type": "full-package",
-  "exportedAt": "2026-06-11T05:37:24.480Z",
+  "exportedAt": "2026-06-11T06:00:37.513Z",
   "students": [
     {
       "id": "laiph",
@@ -2079,6 +2079,9 @@
       "type": "choice",
       "content": "辛孚轻质油在线拉曼方案通常包含哪些组成？",
       "score": 5,
+      "examId": 1781141408505,
+      "isMultiple": true,
+      "creator": "admin",
       "opts": {
         "A": "在线拉曼光谱分析仪",
         "B": "在线密度计",
@@ -2086,11 +2089,8 @@
         "D": "在线分析机柜和在线拉曼采集器",
         "E": "SP-SAMS建模软件和SP-RAS管理软件"
       },
-      "answer": "ABE",
-      "isMultiple": true,
-      "id": 1776175472954,
-      "examId": 1781141408505,
-      "creator": "admin"
+      "answer": "ABDE",
+      "id": 1776175472954
     },
     {
       "type": "choice",
@@ -2241,17 +2241,17 @@
       "type": "choice",
       "content": "关于在线系统安全与供电，以下哪些说法正确？",
       "score": 5,
+      "examId": 1781141408505,
+      "isMultiple": true,
+      "creator": "admin",
       "opts": {
         "A": "正压不足时防爆柜接触器后端整体断电",
         "B": "气压恢复后通常需要人工消除报警并手动重启柜体供电",
-        "C": "气压恢复后通常需要人工消除报警并手动重启柜体供电",
+        "C": "气压恢复后通常会自动将报警上传到指定系统并自动重启柜体供电",
         "D": "稳压器可随意加装在防爆柜内部，不影响防爆"
       },
-      "answer": "ABC",
-      "isMultiple": true,
-      "id": 1776175472964,
-      "examId": 1781141408505,
-      "creator": "admin"
+      "answer": "AB",
+      "id": 1776175472964
     },
     {
       "type": "choice",
@@ -2271,25 +2271,23 @@
     },
     {
       "type": "fill",
-      "content": "汽油、石脑油在线拉曼快评通常选用______ nm激光器，常用拉曼位移范围约为______ cm-1。",
+      "content": "石脑油在线拉曼快评通常选用______ nm激光器，常用拉曼位移范围约为______ cm-1。",
       "score": 4,
-      "opts": {},
-      "answer": "785,150-3300",
-      "_perBlank": 2,
-      "id": 1776175472966,
       "examId": 1781141408505,
-      "creator": "admin"
+      "isMultiple": false,
+      "creator": "admin",
+      "answer": "785,150-3300",
+      "id": 1776175472966
     },
     {
       "type": "fill",
-      "content": "拉曼主机最多可配置______根光纤；采样点与拉曼主机距离通常建议控制在______ m以内，特殊情况下最长一般不超过______ m。",
+      "content": "拉曼主机最多可配置______根光纤通道；采样点与拉曼主机距离通常建议控制在______ m以内，特殊情况下最长一般不超过______ m。",
       "score": 6,
-      "opts": {},
-      "answer": "4,100,150",
-      "_perBlank": 2,
-      "id": 1776175472967,
       "examId": 1781141408505,
-      "creator": "admin"
+      "isMultiple": false,
+      "creator": "admin",
+      "answer": "4,100,150",
+      "id": 1776175472967
     },
     {
       "type": "fill",
