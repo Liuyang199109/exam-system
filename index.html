@@ -418,7 +418,7 @@ A.选项
 B.选项
 C.选项
 D.选项
-答案:__X__（单选）或 答案:__X, Y__（多选，用英文逗号）
+答案:__X__（单选）或 答案:__X, Y__（不定项，用英文逗号）
 分值:2<br>
 <b>填空题：</b>【填空题】题目内容____空____
 答案:答案1，答案2
@@ -428,7 +428,7 @@ D.选项
 （2）子题二（5分）
 参考答案:…<br>
 <b>分值标注方式（任选一种即可）：</b>题目末尾写<b>（X分）</b>；或单独一行写<b>分值:X</b>；填空题写<b>每空X分</b>自动×空数；简答题子题各标<b>（X分）</b>自动求和。</div></div>
-<b>注意：</b>多选题答案为多个字母，如 <code>答案:__A, C, D__</code></div></div>
+<b>注意：</b>不定项选择题答案为多个字母，如 <code>答案:__A, C, D__</code></div></div>
     <!-- 考试 -->
     <div class="adm-tab" id="tab-exam">
       <div class="pg-title">📋 考试管理</div>
@@ -717,7 +717,7 @@ D.选项
         <div class="fs13">
           <div class="fw7 mb2">支持格式（Word内容复制粘贴 或 上传.txt文件）</div>
           <div class="fc-muted">
-            <b>选择题：</b>【选择题】题目内容\nA.选项A\nB.选项B\nC.选项C\nD.选项D\n答案:__X__（单选）或 答案:__X, Y__（多选，逗号分隔）\n分值:2<br>
+            <b>选择题：</b>【选择题】题目内容\nA.选项A\nB.选项B\nC.选项C\nD.选项D\n答案:__X__（单选）或 答案:__X, Y__（不定项，逗号分隔）\n分值:2<br>
             <b>填空题：</b>【填空题】题目内容\n答案:答案1，答案2（多空用中文逗号）\n分值:3<br>
             <b>简答题：</b>【简答题】题目内容\n参考答案:完整答案\n得分点:关键词1,关键词2\n分值:10
           </div>
@@ -785,7 +785,7 @@ D.选项
       <div class="fg"><label>题目类型</label>
         <select id="q-type" onchange="refreshQForm()">
           <option value="choice">单选题</option>
-          <option value="multi">不定项（多选）</option>
+          <option value="multi">不定项</option>
           <option value="fill">填空题</option>
           <option value="essay">简答题</option>
         </select>
@@ -802,14 +802,14 @@ D.选项
           <select id="q-ans"><option>A</option><option>B</option><option>C</option><option>D</option><option>E</option></select>
         </div>
       </div>
-      <!-- 不定项（多选）字段 -->
+      <!-- 不定项字段 -->
       <div id="f-multi" style="display:none">
         <div class="fg"><label>选项 A</label><input id="q-ma" placeholder="选项A内容"></div>
         <div class="fg"><label>选项 B</label><input id="q-mb" placeholder="选项B内容"></div>
         <div class="fg"><label>选项 C</label><input id="q-mc" placeholder="选项C内容（可留空）"></div>
         <div class="fg"><label>选项 D</label><input id="q-md" placeholder="选项D内容（可留空）"></div>
         <div class="fg"><label>选项 E</label><input id="q-me" placeholder="选项E内容（可留空）"></div>
-        <div class="fg"><label>正确答案（多选，如：ABE 或 A,C,E）</label>
+        <div class="fg"><label>正确答案（不定项，如：ABE 或 A,C,E）</label>
           <input id="q-mans" placeholder="如：ABE 或 A,C,E，多个答案用英文逗号分隔，如：A,B,E">
         </div>
       </div>
@@ -2675,7 +2675,7 @@ function openStuAnswerModal(exam,qs,userAns,sub){
         optsHtml=`<div style="font-size:13px;color:var(--muted);margin-bottom:6px">${keys.map(k=>`${k}. ${safeHtml(q.opts[k])}`).join('　')}</div>`;
       }
       s+=`<div class="stu-ans-q">
-        <div class="stu-ans-label">第${qNum}题（${q.score||0}分）${q.isMultiple?'【多选】':''}</div>
+        <div class="stu-ans-label">第${qNum}题（${q.score||0}分）${q.isMultiple?'【不定项】':''}</div>
         <div style="margin-bottom:6px;color:var(--txt)">${safeHtml(q.content||q.stem||'')}</div>
         ${optsHtml}
         <div style="display:flex;flex-direction:column;gap:3px">${correctHtml}${myHtml}</div>
@@ -4299,7 +4299,7 @@ function renderChoice(q,gi,num){
   const ansArr = S.ans[gi] ? S.ans[gi].split(',') : [];
   return `<div class="q-card" id="qc${gi}">
     <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${safeHtml(q.content)}</span>
-      ${isMulti ? '<span style="font-size:11px;color:var(--err);background:#fef2f2;padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600">多选</span>' : ''}
+      ${isMulti ? '<span style="font-size:11px;color:var(--err);background:#fef2f2;padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600">不定项</span>' : ''}
       <button class="flag-btn" id="fb${gi}" onclick="toggleFlag(${gi},this)">📌 标记</button>
     </div>
     <div class="q-sc">${q.score}分${isMulti?' · 可选多项':''}</div>
@@ -4366,7 +4366,7 @@ function pickChoice(gi,k,lbl){
   const isMulti = q && q.isMultiple;
   
   if(isMulti){
-    // 多选题：切换选中状态，维护逗号分隔的答案（始终按字母序排列，避免顺序影响判分）
+    // 不定项：切换选中状态，维护逗号分隔的答案（始终按字母序排列，避免顺序影响判分）
     const cur = S.ans[gi] ? S.ans[gi].split(',').filter(Boolean) : [];
     const idx = cur.indexOf(k);
     if(idx >= 0){
@@ -6930,7 +6930,7 @@ function batchSetScore(){
 }
 
 function batchSetScoreByType(typeKey, score){
-  // typeKey: 'choice'=单选, 'multi'=不定项多选, 'fill'=填空, 'essay'=简答
+  // typeKey: 'choice'=单选, 'multi'=不定项, 'fill'=填空, 'essay'=简答
   const ids=getSelectedQIds();
   if(!ids.length){toast('请先勾选题目','err');return;}
   const idSet=new Set(ids);
@@ -6946,7 +6946,7 @@ function batchSetScoreByType(typeKey, score){
   });
   DB.questions=qs;
   renderQBank();
-  const typeNames={choice:'单选题',multi:'不定项多选题',fill:'填空题',essay:'简答题'};
+  const typeNames={choice:'单选题',multi:'不定项选择题',fill:'填空题',essay:'简答题'};
   toast(`已将选中的 ${changed} 道${typeNames[typeKey]}分值设为 ${score} 分`,'ok');
 }
 
@@ -6979,7 +6979,7 @@ function editQ(id){
   if(!q) return;
   S.editQId=id;
   document.getElementById('addq-title').textContent='✏️ 编辑题目';
-  // 多选题 type 存为 'choice'+isMultiple，表单里显示为 'multi'
+  // 不定项 type 存为 'choice'+isMultiple，表单里显示为 'multi'
   const formType = (q.type==='choice' && q.isMultiple) ? 'multi' : q.type;
   document.getElementById('q-type').value = formType;
   document.getElementById('q-content').value = q.content;
@@ -7318,12 +7318,20 @@ function doParse(){
   if(parsed.length===0){toast('未解析到题目，请检查格式','err');return;}
   const tl={choice:'选择题',fill:'填空题',essay:'简答题'};
   const cl={choice:'b-blue',fill:'b-green',essay:'b-yellow'};
+  function qTypeLabel(q){
+    if(q.type==='choice') return q.isMultiple ? '不定项' : '单选题';
+    return tl[q.type];
+  }
+  function qTypeCls(q){
+    if(q.type==='choice') return q.isMultiple ? 'b-red' : 'b-blue';
+    return cl[q.type];
+  }
   document.getElementById('imp-cnt').textContent=parsed.length;
   document.getElementById('imp-list').innerHTML=parsed.map((q,i)=>`
     <div style="padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
-      <div class="flex aic gap2 mb2"><span class="badge ${cl[q.type]}">${tl[q.type]}</span><span class="fs13 fc-muted">第${i+1}题 · <b style="color:var(--pri)">${q.score}分</b>${q._perBlank?`（每空${q._perBlank}分）`:''}</span></div>
+      <div class="flex aic gap2 mb2"><span class="badge ${qTypeCls(q)}">${qTypeLabel(q)}</span><span class="fs13 fc-muted">第${i+1}题 · <b style="color:var(--pri)">${q.score}分</b>${q._perBlank?`（每空${q._perBlank}分）`:''}</span></div>
       <div style="font-size:14px">${safeHtml(q.content)}</div>
-      ${q.type==='choice'?`<div class="fs13 fc-muted mt2">${Object.keys(q.opts||{}).sort().filter(k=>q.opts[k]).map(k=>`${k}.${safeHtml(q.opts[k])}`).join(' | ')} <b>→答案:${q.answer}</b></div>`:''}
+      ${q.type==='choice'?`<div class="fs13 fc-muted mt2">${Object.keys(q.opts||{}).sort().filter(k=>q.opts[k]).map(k=>`${k}.${safeHtml(q.opts[k])}`).join(' | ')} <b>→答案:${q.answer}${q.isMultiple?'&nbsp;<span style="font-size:11px;color:var(--err);font-weight:600">（不定项）</span>':''}</b></div>`:''}
       ${q.type==='fill'?`<div class="fs13 fc-muted mt2">答案: ${safeHtml(q.answer)}</div>`:''}
       ${q.type==='essay'?`<div class="fs13 fc-muted mt2">${q.refAns?`参考答案: ${safeHtml(q.refAns).substring(0,200)}${q.refAns.length>200?'...':''}`:''}${q.keywords?` | 得分点: ${esc(q.keywords||'')}`:''}</div>`:''}
     </div>`).join('');
@@ -7580,7 +7588,7 @@ function parseTxt(txt){
           q._perBlank = scoreInfo.score;
         }
         
-        // 检测题型标记：题目内容中明确写了"不定项/多选"，或当前章节是不定项章节
+        // 检测题型标记：题目内容中明确写了不定项（或兼容旧格式的"多选/复选"），或当前章节是不定项章节
         const isFill=/___|_{2,}|____/.test(qContent)||(lines[i+1]&&/___/.test(lines[i+1]));
         const isMulti=sectionIsMulti || /(不定项|多选|复选)/.test(qContent);
         
@@ -7601,7 +7609,7 @@ function parseTxt(txt){
         // 先预扫描到下一题之前的行范围（用于统一查找分值）
         let nextQIdx = lines.length;
         for(let j=i+1;j<lines.length;j++){
-          if(/^(\d+)[.．、\uFF0E]\s/.test(lines[j])){ nextQIdx=j; break; }
+          if(/^(\d+)[.．、\uFF0E]\s*/.test(lines[j])){ nextQIdx=j; break; }
         }
 
         if(optCount>=2){
@@ -7710,7 +7718,9 @@ function parseTxt(txt){
           let qContent = line;
           const scoreInfo = extractScore(qContent, 5);
           qContent = scoreInfo.content;
-          let q = {type:'choice', content:qContent, score:scoreInfo.score, opts:{}, answer:''};
+          // 不定项判断：当前章节是不定项章节（兼容旧格式"多选/复选"），或题目内容中明确标注
+          const isMulti = sectionIsMulti || /(不定项|多选|复选)/.test(qContent);
+          let q = {type:'choice', content:qContent, score:scoreInfo.score, opts:{}, answer:'', isMultiple:false};
           
           // 找出下一题的位置：寻找【分数】/【每空】行后第一个非选项行或章节标题
           let nextQ = lines.length;
@@ -7736,7 +7746,10 @@ function parseTxt(txt){
             if(om){ q.opts[om[1]] = om[2].trim(); }
             // 答案
             const ansM = ol.match(/^答案[：:]\s*[_]{0,2}([A-Z](?:\s*[，,、\s]\s*[A-Z])*)[_]{0,2}/);
-            if(ansM) q.answer = ansM[1].replace(/[，,、\s]/g,'').toUpperCase().split('').sort().join('');
+            if(ansM){
+              q.answer = ansM[1].replace(/[，,、\s]/g,'').toUpperCase().split('').sort().join('');
+              if(isMulti || q.answer.length > 1) q.isMultiple = true;
+            }
             // 分值
             const sl = findScoreLine([ol], 0, 1);
             if(sl && sl.score) q.score = sl.score;
@@ -8086,10 +8099,10 @@ function openPreviewModal(exam, qs){
 
 function renderPreviewChoice(q, gi, num){
   const opts=Object.keys(q.opts||{}).sort().filter(k=>q.opts[k]);
-  const typeTag = q.isMultiple ? '<span style="font-size:11px;color:var(--err);background:#fef2f2;padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600">多选</span>' : '';
+  const typeTag = q.isMultiple ? '<span style="font-size:11px;color:var(--err);background:#fef2f2;padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600">不定项</span>' : '';
   return `<div class="q-card" id="pqc${gi}">
     <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${safeHtml(q.content)}${typeTag}</span></div>
-    <div class="q-sc">${q.score}分${q.isMultiple?' &nbsp;·&nbsp; 多选题，可选多项':''}</div>
+    <div class="q-sc">${q.score}分${q.isMultiple?' &nbsp;·&nbsp; 不定项选择题（可选一项或多项）':''}</div>
     <div class="choices">${opts.map(k=>`
       <label class="ch" style="cursor:default">
         <input type="${q.isMultiple?'checkbox':'radio'}" name="pq${gi}" value="${k}" disabled><span><b>${k}.</b> ${safeHtml(q.opts[k])}</span>
@@ -9539,7 +9552,7 @@ function submitGrade(){
 }
 
 // ★ 批量重算所有答卷的全部题型分数（选择+填空+简答）
-// 用于评分逻辑更新后（多选格式、人工规则、智能评分等）修正历史数据
+// 用于评分逻辑更新后（不定项格式、人工规则、智能评分等）修正历史数据
 function batchRecalcAllScore(forceReset = false){
   const subs = DB.submissions;
   const keys = Object.keys(subs);
@@ -11505,6 +11518,10 @@ function _restoreModalStates(){
           if(savedExamId || savedQId){
             _retryOpenGradingRules(savedExamId || '', savedQId || '', 0);
           }
+        }
+        // ★ 导入弹窗恢复：重新填充考试下拉菜单（避免刷新后下拉为空）
+        if(id === 'm-import'){
+          ensureExamOptions();
         }
       }
     }, 50);
