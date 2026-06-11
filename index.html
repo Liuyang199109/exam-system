@@ -513,9 +513,13 @@ D.选项
           </div>
 
           <!-- 考试场次列表区 -->
-          <div style="flex:1;min-width:180px;background:#f0fdf4;border-radius:8px;padding:8px 10px;max-height:80px;overflow-y:auto">
-            <div id="grade-exam-list" style="display:flex;flex-wrap:wrap;gap:4px 14px;align-content:flex-start">
-              <div style="color:var(--muted);font-size:11px;padding:2px 0">暂无考试数据</div>
+          <div style="flex:1;min-width:180px">
+            <select id="grade-exam-sel" multiple
+              style="width:100%;height:72px;padding:4px;border:1.5px solid #86efac;border-radius:6px;font-size:12px;background:#f0fdf4"
+              onchange="onExamSelChange()">
+              <option value="" disabled>— 选择考试场次（Ctrl+点击多选） —</option>
+            </select>
+          </div>
             </div>
           </div>
         </div>
@@ -535,7 +539,7 @@ D.选项
             </button>
           </div>
         <div class="tbl-wrap"><table>
-          <thead><tr><th style="width:36px"><input type="checkbox" id="ck-all-subs" onchange="toggleAllSubmissions(this.checked)"></th><th>#</th><th>考生</th><th>考试</th><th>智能预估</th><th>最终成绩</th><th>差值</th><th>操作</th></tr></thead>
+          <thead id="grade-thead"></thead>
           <tbody id="t-grade" onclick="gradeTableClick(event)"></tbody>
         </table>
         <div id="no-sub" style="text-align:center;padding:36px;color:var(--muted)">暂无已交卷记录</div>
@@ -706,7 +710,7 @@ D.选项
     <div class="modal-hd"><h3>📄 导入 Word 题目</h3><button class="modal-close" onclick="closeM('m-import')">✕</button></div>
     <div class="modal-bd">
       <div class="fg"><label>将题目导入到 <span style="color:var(--err)">*</span></label>
-        <select id="imp-exam"><option value="">请先选择目标考试</option></select>
+        <select id="imp-exam" onfocus="ensureExamOptions()"><option value="">请先选择目标考试</option></select>
       </div>
       <div class="tip-box">
         <span style="font-size:18px">📋</span>
@@ -786,7 +790,7 @@ D.选项
           <option value="essay">简答题</option>
         </select>
       </div>
-      <div class="fg"><label>题目内容</label><textarea id="q-content" rows="3" placeholder="输入题目内容…"></textarea></div>
+      <div class="fg"><label>题目内容 <button type="button" onclick="uploadImg2Textarea('q-content')" style="font-size:11px;padding:2px 8px;border:1px solid #86b7fe;border-radius:4px;background:#eff6ff;cursor:pointer;color:#2563eb" title="粘贴截图或点击上传">🖼 插入图片</button></label><textarea id="q-content" rows="3" placeholder="输入题目内容…（Ctrl+V 可粘贴截图）" onpaste="handleTextareaPaste(event,'q-content')"></textarea></div>
       <!-- 选择题字段（单选题） -->
       <div id="f-choice">
         <div class="fg"><label>选项 A</label><input id="q-a" placeholder="选项A内容"></div>
@@ -815,7 +819,7 @@ D.选项
       </div>
       <!-- 简答题字段 -->
       <div id="f-essay" style="display:none">
-        <div class="fg"><label>参考答案</label><textarea id="q-ref" rows="4" placeholder="完整参考答案…"></textarea></div>
+        <div class="fg"><label>参考答案 <button type="button" onclick="uploadImg2Textarea('q-ref')" style="font-size:11px;padding:2px 8px;border:1px solid #86b7fe;border-radius:4px;background:#eff6ff;cursor:pointer;color:#2563eb" title="粘贴截图或点击上传">🖼 插入图片</button></label><textarea id="q-ref" rows="4" placeholder="完整参考答案…（Ctrl+V 可粘贴截图）" onpaste="handleTextareaPaste(event,'q-ref')"></textarea></div>
         <div class="fg"><label>得分关键词（逗号分隔，每命中1个关键词得相应比例分）</label><input id="q-kw" placeholder="关键词1,关键词2,关键词3"></div>
       </div>
       <div class="fg"><label>分值</label><input type="number" id="q-score" value="5" min="1" max="100" style="width:100px"></div>
@@ -2451,9 +2455,10 @@ function renderStuExamList(){
         const essayTot = getObjTotal(sub.essayAutoScore);
         const autoTotal=sub.autoTotal??(sub.choiceScore||0+fillTot+essayTot);
         const finalScore=sub.finalScore;
-        const isFinal=finalScore!==null && finalScore!==undefined;
         // 判断是否有教师手动评分明细（有>0的教师分）
         const hasTeacherDetail = sub.teacherScores && Object.values(sub.teacherScores).some(v=>v>0);
+        // 只有真正有人工评分时才算"已复核"（不能仅凭 finalScore 非空判断）
+        const isFinal=finalScore!==null && finalScore!==undefined && hasTeacherDetail;
         // 当有人工评分时，显示最终成绩徽章
         const finalBadge = isFinal
           ? `<div style="margin-top:8px;padding:8px 14px;background:linear-gradient(135deg,#16a34a,#15803d);border-radius:10px;text-align:center;color:#fff">
@@ -2570,9 +2575,9 @@ function openStuAnswerModal(exam,qs,userAns,sub){
   const orderedQs=[...choices,...fills,...essays]; // 全局顺序
   let html='';
 
-  // 是否有人工评分结果
-  const hasFinal = sub && sub.finalScore !== null && sub.finalScore !== undefined;
+  // 是否有人工评分结果（必须有教师评分明细才算已复核）
   const hasTeacherScores = sub && sub.teacherScores && Object.keys(sub.teacherScores).length > 0;
+  const hasFinal = sub && sub.finalScore !== null && sub.finalScore !== undefined && hasTeacherScores;
 
   // 辅助：生成得分徽章 HTML（填空/简答用）
   function scoreTagHtml(gi, qType, qScore){
@@ -2623,8 +2628,8 @@ function openStuAnswerModal(exam,qs,userAns,sub){
         myHtml=myAns?`<span class="${isRight?'stu-ans-correct':'stu-ans-wrong'}">${isRight?'✔':'✘'} 我的答案：${esc(myStr)}</span>`:'<span style="color:var(--muted)">（未作答）</span>';
       } else if(q.type==='fill'){
         const refAns=Array.isArray(q.answer)?q.answer.join(' | '):(q.answer||'');
-        correctHtml=`<span class="stu-ans-ref">📌 参考答案：${esc(refAns)}</span>`;
-        myHtml=myAns?`<span style="color:var(--txt)">📝 我的答案：${esc(myAns)}</span>`:'<span style="color:var(--muted)">（未作答）</span>';
+        correctHtml=`<span class="stu-ans-ref">📌 参考答案：${safeHtml(refAns)}</span>`;
+        myHtml=myAns?`<span style="color:var(--txt)">📝 我的答案：${safeHtml(myAns)}</span>`:'<span style="color:var(--muted)">（未作答）</span>';
         myHtml += scoreTagHtml(gi, 'fill', q.score||0);
       } else {
         const refAns=q.refAns||q.answer||q.refAnswer||'';
@@ -2657,8 +2662,8 @@ function openStuAnswerModal(exam,qs,userAns,sub){
           }
         }
         
-        correctHtml=`<span class="stu-ans-ref">📌 参考答案：${esc(refAns)}</span>${kwStr?`<br><span class="stu-ans-ref">🔑 得分点：${esc(kwStr)}</span>`:''}`;
-        myHtml=myAns?`<span style="color:var(--txt)">📝 我的答案：${esc(myAns)}</span>`:'<span style="color:var(--muted)">（未作答）</span>';
+        correctHtml=`<span class="stu-ans-ref">📌 参考答案：${safeHtml(refAns)}</span>${kwStr?`<br><span class="stu-ans-ref">🔑 得分点：${safeHtml(kwStr)}</span>`:''}`;
+        myHtml=myAns?`<span style="color:var(--txt)">📝 我的答案：${safeHtml(myAns)}</span>`:'<span style="color:var(--muted)">（未作答）</span>';
         if(countScoreHtml){
           myHtml += countScoreHtml;
         }
@@ -2667,11 +2672,11 @@ function openStuAnswerModal(exam,qs,userAns,sub){
       let optsHtml='';
       if(q.type==='choice'&&q.opts){
         const keys=Object.keys(q.opts).filter(k=>q.opts[k]);
-        optsHtml=`<div style="font-size:13px;color:var(--muted);margin-bottom:6px">${keys.map(k=>`${k}. ${esc(q.opts[k])}`).join('　')}</div>`;
+        optsHtml=`<div style="font-size:13px;color:var(--muted);margin-bottom:6px">${keys.map(k=>`${k}. ${safeHtml(q.opts[k])}`).join('　')}</div>`;
       }
       s+=`<div class="stu-ans-q">
         <div class="stu-ans-label">第${qNum}题（${q.score||0}分）${q.isMultiple?'【多选】':''}</div>
-        <div style="margin-bottom:6px;color:var(--txt)">${esc(q.content||q.stem||'')}</div>
+        <div style="margin-bottom:6px;color:var(--txt)">${safeHtml(q.content||q.stem||'')}</div>
         ${optsHtml}
         <div style="display:flex;flex-direction:column;gap:3px">${correctHtml}${myHtml}</div>
       </div>`;
@@ -4293,14 +4298,14 @@ function renderChoice(q,gi,num){
   const inpType = isMulti ? 'checkbox' : 'radio';
   const ansArr = S.ans[gi] ? S.ans[gi].split(',') : [];
   return `<div class="q-card" id="qc${gi}">
-    <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${esc(q.content)}</span>
+    <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${safeHtml(q.content)}</span>
       ${isMulti ? '<span style="font-size:11px;color:var(--err);background:#fef2f2;padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600">多选</span>' : ''}
       <button class="flag-btn" id="fb${gi}" onclick="toggleFlag(${gi},this)">📌 标记</button>
     </div>
     <div class="q-sc">${q.score}分${isMulti?' · 可选多项':''}</div>
     <div class="choices">${opts.map(k=>`
       <label class="ch${ansArr.includes(k)?' on':''}" id="ch${gi}${k}">
-        <input type="${inpType}" name="q${gi}" value="${k}" ${ansArr.includes(k)?'checked':''} ${isMulti?'onchange':'onclick'}="pickChoice(${gi},'${k}',this)"><span><b>${k}.</b> ${esc(q.opts[k])}</span>
+        <input type="${inpType}" name="q${gi}" value="${k}" ${ansArr.includes(k)?'checked':''} ${isMulti?'onchange':'onclick'}="pickChoice(${gi},'${k}',this)"><span><b>${k}.</b> ${safeHtml(q.opts[k])}</span>
       </label>`).join('')}</div>
   </div>`;
 }
@@ -4327,7 +4332,7 @@ function renderFill(q,gi,num){
 
   // 如果题目中没有下划线（n=0），退化为题干+独立输入框
   if(n === 0){
-    inlineHtml = esc(q.content);
+    inlineHtml = safeHtml(q.content);
   }
 
   return `<div class="q-card" id="qc${gi}">
@@ -4342,11 +4347,14 @@ function renderFill(q,gi,num){
 function renderEssay(q,gi,num){
   const val=S.ans[gi]||'';
   return `<div class="q-card" id="qc${gi}">
-    <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${esc(q.content)}</span>
+    <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${safeHtml(q.content)}</span>
       <button class="flag-btn" id="fb${gi}" onclick="toggleFlag(${gi},this)">📌 标记</button>
     </div>
     <div class="q-sc">${q.score}分</div>
-    <textarea class="fill-inp" rows="6" style="margin-top:10px" placeholder="在此输入答案（支持复制粘贴）…" oninput="saveEssay(${gi},this.value)">${esc(val)}</textarea>
+    <div style="display:flex;align-items:flex-start;gap:6px">
+      <textarea class="fill-inp" id="essay-ta-${gi}" rows="6" style="margin-top:10px;flex:1" placeholder="在此输入答案…（Ctrl+V 可粘贴截图）" oninput="saveEssay(${gi},this.value)" onpaste="handleTextareaPaste(event,'essay-ta-${gi}'); setTimeout(()=>saveEssay(${gi},document.getElementById('essay-ta-${gi}').value),100)">${esc(val)}</textarea>
+      <button type="button" onclick="uploadImg2Textarea('essay-ta-${gi}'); setTimeout(()=>saveEssay(${gi},document.getElementById('essay-ta-${gi}').value),100)" style="margin-top:10px;font-size:11px;padding:4px 8px;border:1px solid #86b7fe;border-radius:6px;background:#eff6ff;cursor:pointer;color:#2563eb;white-space:nowrap;flex-shrink:0" title="上传或粘贴图片">🖼</button>
+    </div>
   </div>`;
 }
 
@@ -5512,6 +5520,18 @@ function checkKeywordGroupHit(group, searchText, relation) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// 通用关键词命中检查（供 smartEssayScore 和阅卷弹窗共用）
+// 支持 | (OR) 和 && (AND) 语法，与评分规则保持一致
+//   返回 true 表示该关键词项在答案中命中
+// ─────────────────────────────────────────────────────────────
+function checkKeywordsHit(kwItem, userAnswer) {
+  const groups = splitKeywordGroups(kwItem);
+  if (groups.length === 0) return false;
+  // 任意一个关键词组命中即整体命中（同 calculateKeywordScore 逻辑）
+  return groups.some(g => checkKeywordGroupHit(g.group, userAnswer, g.relation));
+}
+
 function calculateKeywordScore(condition, userAnswer, options = {}) {
   const { partialMatch = false, partialRatio = 0.5 } = options;
   
@@ -5537,9 +5557,17 @@ function calculateKeywordScore(condition, userAnswer, options = {}) {
   }
   
   for (const part of parts) {
-    const match = part.trim().match(/^[（(]([^）)]+)[）)]\s*(.+)$/);
+    // 配对括号匹配：支持 (label) 和 （label） 两种格式，不交叉
+    // 优先匹配 ASCII 括号 (label)，再匹配全角括号 （label）
+    // 这样可以正确处理 (（1）)1064:2 这类嵌套括号格式
+    let match = part.trim().match(/^\(([^)]+)\)\s*(.+)$/);
+    if (!match) {
+      match = part.trim().match(/^（([^）]+)）\s*(.+)$/);
+    }
     if (match) {
-      const label = match[1];
+      // 规范化标签：去掉标签内部可能含有的括号（如 "（1）" → "1"）
+      const rawLabel = match[1];
+      const label = rawLabel.replace(/^[（(]([^）)]+)[）)]$/, '$1');
       const rest = match[2];
       // 查找最后一个冒号，用于分隔关键词和分值
       const colonIdx = rest.lastIndexOf(':');
@@ -6141,6 +6169,11 @@ function smartEssayScore(q, userAnswer){
   if(!ua.trim()) return 0;
   let hits=0;
   kws.forEach(k=>{
+    // 支持 | (OR) / && (AND) 语法匹配（与评分规则一致）
+    if(checkKeywordsHit(k, ua)){
+      hits++; return;
+    }
+    // 旧逻辑：纯字符串精确匹配
     const kw=k.toLowerCase();
     if(ua.includes(kw)){
       hits++; return;
@@ -6773,7 +6806,7 @@ function renderQBank(defer){
       <div style="font-size:10px;color:#94a3b8" title="examId=${q.examId}">${examIdDisplay}</div>
     </td>
     <td>${typeLabel}</td>
-    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(q.content)}${q.type==='choice'&&q.opts?'\n选项：'+Object.entries(q.opts).filter(([,v])=>v).map(([k,v])=>k+'. '+v).join('  '):''}">${esc(q.content)}</td>
+    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(q.content)}${q.type==='choice'&&q.opts?'\n选项：'+Object.entries(q.opts).filter(([,v])=>v).map(([k,v])=>k+'. '+v).join('  '):''}">${safeHtml(q.content)}</td>
     <td>${q.score}分</td>
     <td><div class="flex gap2" style="flex-wrap:nowrap">
       <button class="btn btn-sec btn-sm" onclick="event.stopPropagation();editQ(${q.id})">编辑</button>
@@ -7247,14 +7280,34 @@ function openImport(){
   document.getElementById('imp-preview').style.display='none';
   document.getElementById('btn-imp-ok').classList.add('hide');
   S.parsedQs=[];
-  // 填充考试下拉
+  // 填充考试下拉，默认继承外部选择的考试场次
   const sel=document.getElementById('imp-exam');
   if(sel){
+    // 记住之前的选择（弹窗内的上次选择）
+    const prevVal = sel.value || '';
     const exams=getExamList();
+    // 外部题库管理页选择的考试场次（qf-exam）
+    const outerExamId = document.getElementById('qf-exam')?.value || '';
+    // 优先级：外部选择 > 弹窗内上次选择
+    const defaultId = outerExamId || prevVal;
     sel.innerHTML='<option value="">请选择目标考试</option>'+
-      exams.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('');
+      exams.map(e=>`<option value="${e.id}" ${String(e.id)===String(defaultId)?'selected':''}>${esc(e.name)}</option>`).join('');
   }
   openM('m-import');
+}
+// ★ 保障考试下拉框始终有选项（支持 F5 刷新后恢复）
+function ensureExamOptions(){
+  const sel=document.getElementById('imp-exam');
+  if(!sel) return;
+  // 如果只有一个默认option（没有真实考试选项），重新填充
+  if(sel.options.length <= 1){
+    const prevVal = sel.value || '';
+    const exams=getExamList();
+    const outerExamId = document.getElementById('qf-exam')?.value || '';
+    const defaultId = outerExamId || prevVal;
+    sel.innerHTML='<option value="">请选择目标考试</option>'+
+      exams.map(e=>`<option value="${e.id}" ${String(e.id)===String(defaultId)?'selected':''}>${esc(e.name)}</option>`).join('');
+  }
 }
 
 function doParse(){
@@ -7269,10 +7322,10 @@ function doParse(){
   document.getElementById('imp-list').innerHTML=parsed.map((q,i)=>`
     <div style="padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px">
       <div class="flex aic gap2 mb2"><span class="badge ${cl[q.type]}">${tl[q.type]}</span><span class="fs13 fc-muted">第${i+1}题 · <b style="color:var(--pri)">${q.score}分</b>${q._perBlank?`（每空${q._perBlank}分）`:''}</span></div>
-      <div style="font-size:14px">${esc(q.content)}</div>
-      ${q.type==='choice'?`<div class="fs13 fc-muted mt2">${Object.keys(q.opts||{}).sort().filter(k=>q.opts[k]).map(k=>`${k}.${esc(q.opts[k])}`).join(' | ')} <b>→答案:${q.answer}</b></div>`:''}
-      ${q.type==='fill'?`<div class="fs13 fc-muted mt2">答案: ${esc(q.answer)}</div>`:''}
-      ${q.type==='essay'?`<div class="fs13 fc-muted mt2">得分点: ${esc(q.keywords||'')}</div>`:''}
+      <div style="font-size:14px">${safeHtml(q.content)}</div>
+      ${q.type==='choice'?`<div class="fs13 fc-muted mt2">${Object.keys(q.opts||{}).sort().filter(k=>q.opts[k]).map(k=>`${k}.${safeHtml(q.opts[k])}`).join(' | ')} <b>→答案:${q.answer}</b></div>`:''}
+      ${q.type==='fill'?`<div class="fs13 fc-muted mt2">答案: ${safeHtml(q.answer)}</div>`:''}
+      ${q.type==='essay'?`<div class="fs13 fc-muted mt2">${q.refAns?`参考答案: ${safeHtml(q.refAns).substring(0,200)}${q.refAns.length>200?'...':''}`:''}${q.keywords?` | 得分点: ${esc(q.keywords||'')}`:''}</div>`:''}
     </div>`).join('');
   document.getElementById('imp-preview').style.display='block';
   document.getElementById('btn-imp-ok').classList.remove('hide');
@@ -7445,8 +7498,12 @@ function parseTxt(txt){
         let q={type, content: extracted.content, score: extracted.score};
         if(type==='choice'){
           q.opts={};
-          const ansMatch=blk.match(/答案[：:]\s*__([A-Z](?:\s*,\s*[A-Z])*)__/);
+          const ansMatch=blk.match(/答案[：:]\s*[_]{1,2}([A-Z](?:\s*,\s*[A-Z])*)[_]{1,2}/);
           if(ansMatch) q.answer=ansMatch[1].replace(/\s/g,'').toUpperCase();
+          else {
+            const ansMatch2=blk.match(/答案[：:]\s*([A-Z](?:\s*[，,、\s]\s*[A-Z])*)\s*(?:\n|$)/);
+            if(ansMatch2) q.answer=ansMatch2[1].replace(/[，,、\s]/g,'').toUpperCase();
+          }
           lines.slice(1).forEach(l=>{
             if(/^A[.．、:\s]/.test(l)) q.opts.A=l.replace(/^A[.．、:\s]*/,'').trim();
             else if(/^B[.．、:\s]/.test(l)) q.opts.B=l.replace(/^B[.．、:\s]*/,'').trim();
@@ -7491,12 +7548,16 @@ function parseTxt(txt){
     let i=0;
     // 章节标题跟踪：检测 ## 二、不定项选择题 这类标题，设置 sectionIsMulti 标志
     let sectionIsMulti = false;
+    let currentSection = ''; // 'choice'/'fill'/'essay'
     while(i<lines.length){
       const line=lines[i];
 
       // ---- 检测章节标题（## 一、... / ## 二、...）----
       if(/^#{1,3}\s/.test(line) || /^[一二三四五六七八九十]+[、．.]\s*/.test(line)){
         sectionIsMulti = /(不定项|多选|复选)/.test(line);
+        if(/(单)?选/.test(line)||/(不定项|多选|复选)/.test(line)) currentSection = 'choice';
+        else if(/填空/.test(line)) currentSection = 'fill';
+        else if(/(简答|问答|综合|论述)/.test(line)) currentSection = 'essay';
         i++;
         continue;
       }
@@ -7550,8 +7611,14 @@ function parseTxt(txt){
           // 查找答案行 + 分值行
           for(let j=i+1;j<nextQIdx;j++){
             const ansLine=lines[j];
-            // 支持多种下划线格式：__A__ 或 _B___ 或 __A, C, D__
-            const ansMatch=ansLine.match(/^答案[：:]\s*[_]{1,2}([A-Z](?:\s*[，,\s]\s*[A-Z])*)[_]{1,2}/);
+            // 答案匹配：极致兼容，支持任意下划线组合及无下划线
+            let ansMatch=null;
+            // 1) 有下划线：_B_  __B__  _A, B_ 等（单/双下划线）
+            ansMatch=ansLine.match(/^答案[：:]\s*[_]{1,2}([A-Z](?:\s*[，,、\s]\s*[A-Z])*)[_]{1,2}/);
+            // 2) 无下划线：答案：B 或 答案: A, B
+            if(!ansMatch) ansMatch=ansLine.match(/^答案[：:]\s*([A-Z](?:\s*[，,、\s]\s*[A-Z])*)\s*$/);
+            // 3) 最宽松：答案行中包含大写字母即提取（作为最后手段）
+            if(!ansMatch) ansMatch=ansLine.match(/^答案[：:].*?([A-Z](?:\s*[，,、\s]\s*[A-Z])*)/);
             if(ansMatch){
               // 统一存为不带逗号的排序字母串：ABCD，避免格式不一致影响判分
               q.answer=ansMatch[1].replace(/[，,\s]/g,'').toUpperCase().split('').sort().join('');
@@ -7624,7 +7691,152 @@ function parseTxt(txt){
           }
         }
         result.push(q);
+        i = nextQIdx; // 跳过已处理的题目和选项行（外层还有 i++，所以先减1）
+        continue;
       }
+      
+      // ★ 无题号题目检测：Word自动编号被mammoth去掉后，题目以纯文本开头，后面紧跟A/B/C/D选项
+      if(currentSection && !qMatch){
+        // 检查接下来的行是否为选项格式（至少2个A./B./C./D.行）
+        let optPreview = [];
+        for(let k=i+1;k<lines.length&&k<i+8;k++){
+          const nl = lines[k];
+          if(/^[A-E][.．、:\s]/.test(nl)) optPreview.push(nl);
+          else if(optPreview.length>=2) break;
+          else if(/^\d+[.．、]/.test(nl)||/^答案/.test(nl)||/^#{1,3}\s/.test(nl)) break;
+        }
+        if(optPreview.length >= 2){
+          // 视为选择题：当前行为题目内容
+          let qContent = line;
+          const scoreInfo = extractScore(qContent, 5);
+          qContent = scoreInfo.content;
+          let q = {type:'choice', content:qContent, score:scoreInfo.score, opts:{}, answer:''};
+          
+          // 找出下一题的位置：寻找【分数】/【每空】行后第一个非选项行或章节标题
+          let nextQ = lines.length;
+          let foundScore = false;
+          for(let k=i+1;k<lines.length;k++){
+            const lk = lines[k];
+            // 章节标题 → 立即结束（不跳过做题）
+            if(/^#{1,3}\s/.test(lk)||/^[一二三四五六七八九十]+[、．.]\s/.test(lk)){ nextQ = k; break; }
+            if(/^【分数/.test(lk)||/^【每空/.test(lk)){ foundScore = true; continue; }
+            if(!foundScore) continue;
+            // 跳过答案行和空白
+            if(/^答案[：:]/.test(lk)) continue;
+            // 找到：下一题的起始行
+            if(!/^[A-E][.．、:\s]/.test(lk) && !/^_\s*$/.test(lk)){
+              nextQ = k; break;
+            }
+          }
+          
+          // 解析选项
+          for(let j=i+1;j<nextQ && j<i+15;j++){
+            const ol = lines[j];
+            const om = ol.match(/^([A-E])[.．、:\s]\s*(.+)/);
+            if(om){ q.opts[om[1]] = om[2].trim(); }
+            // 答案
+            const ansM = ol.match(/^答案[：:]\s*[_]{0,2}([A-Z](?:\s*[，,、\s]\s*[A-Z])*)[_]{0,2}/);
+            if(ansM) q.answer = ansM[1].replace(/[，,、\s]/g,'').toUpperCase().split('').sort().join('');
+            // 分值
+            const sl = findScoreLine([ol], 0, 1);
+            if(sl && sl.score) q.score = sl.score;
+          }
+          result.push(q);
+          i = nextQ; // 直接跳到下一题的起始行
+          continue;
+        }
+        // 不是选择题，继续尝试识别填空题
+        if(/___|_{2,}|____/.test(line)){
+          let q = {type:'fill', content:line, score:5, answer:''};
+          let nextQ = lines.length;
+          let foundScore2 = false;
+          for(let k=i+1;k<lines.length;k++){
+            const lk = lines[k];
+            // 章节标题 → 立即结束
+            if(/^#{1,3}\s/.test(lk)||/^[一二三四五六七八九十]+[、．.]\s/.test(lk)){ nextQ = k; break; }
+            if(/^【分数/.test(lk)||/^【每空/.test(lk)){ foundScore2 = true; continue; }
+            if(!foundScore2) continue;
+            if(/^答案[：:]/.test(lk)) continue;
+            if(!/^[A-E][.．、:\s]/.test(lk) && !/^_\s*$/.test(lk)){ nextQ = k; break; }
+          }
+          for(let j=i+1;j<nextQ;j++){
+            if(/^答案[：:]/.test(lines[j])) q.answer = lines[j].replace(/^答案[：:]\s*/,'').trim();
+            const sl = findScoreLine([lines[j]], 0, 1);
+            if(sl){
+              if(sl.perBlank){
+                const blanks = countBlanks(q.content);
+                q.score = sl.perBlank * blanks;
+                q._perBlank = sl.perBlank;
+              } else if(sl.score){
+                q.score = sl.score;
+              }
+            }
+          }
+          result.push(q);
+          i = nextQ;
+          continue;
+        }
+        // 不是选择也不是填空，尝试识别简答题：后续行有参考答案/得分点/【(分值:特征
+        if(currentSection === 'essay'){
+          // 简答题 nextQ：到下一个【(分值 行或章节标题或数字题号
+          let nextQ = lines.length;
+          for(let k=i+1;k<lines.length;k++){
+            const lk = lines[k];
+            if(/^#{1,3}\s/.test(lk)||/^[一二三四五六七八九十]+[、．.]\s/.test(lk)){
+              nextQ = k; break;
+            }
+            // 到了下一题的【(分值 标记（但跳过当前题的）
+            if(/^【\(分值/.test(lk)||/^\[\(分值/.test(lk)){
+              // 检查前面是否已经过了分值行
+              let hasPassedScore = false;
+              for(let m=k-1;m>i;m--){
+                if(/^分值[：:]/.test(lines[m])||/^得分点[：:]/.test(lines[m])||/^参考答案[：:]/.test(lines[m])){
+                  hasPassedScore = true; break;
+                }
+              }
+              if(hasPassedScore){ nextQ = k; break; }
+            }
+          }
+          
+          let q = {type:'essay', content:line, score:5, refAns:'', keywords:''};
+          // 如果 content 是【(分值 或 【(分值 标记（题目在上一行），往前找真正的题目
+          if(/^【\(分值/.test(q.content)||/^\[\(分值/.test(q.content)){
+            // 往回找：跳过当前行，往前找上一非空非标记行作为题目
+            let realContent = '';
+            for(let b=i-1;b>=0;b--){
+              const bl = lines[b];
+              if(!bl) continue;
+              // 遇到章节标题或上一题边界 → 停止
+              if(/^#{1,3}\s/.test(bl)||/^[一二三四五六七八九十]+[、．.]\s/.test(bl)) break;
+              // 遇到答案/分值/得分点行 → 跳过
+              if(/^答案[：:]/.test(bl)||/^分值[：:]/.test(bl)||/^得分点[：:]/.test(bl)||/^【\(分值/.test(bl)) continue;
+              // 找到题目
+              realContent = bl; break;
+            }
+            q.content = realContent || line;
+          }
+          for(let j=i+1;j<nextQ;j++){
+            const el = lines[j];
+            if(/^参考答案[：:]/.test(el)){ 
+              q.refAns = el.replace(/^参考答案[：:]\s*/,'').trim();
+              // 收集多行答案（直到得分点/分值/下一标记）
+              for(let a=j+1;a<nextQ;a++){
+                const al = lines[a];
+                if(/^得分点[：:]/.test(al)||/^分值[：:]/.test(al)||/^【\(分值/.test(al)) break;
+                if(al.trim()) q.refAns += '\n' + al.trim();
+              }
+            }
+            else if(/^得分点[：:]/.test(el)) q.keywords = el.replace(/^得分点[：:]\s*/,'').trim();
+            else if(/^分值[：:]/.test(el)){ const sm=el.match(/(\d+)/); if(sm) q.score=parseInt(sm[1]); }
+          }
+          const subTotal = sumSubScores(lines, i, nextQ);
+          if(subTotal) q.score = subTotal;
+          result.push(q);
+          i = nextQ;
+          continue;
+        }
+      }
+      
       i++;
     }
   }
@@ -7876,11 +8088,11 @@ function renderPreviewChoice(q, gi, num){
   const opts=Object.keys(q.opts||{}).sort().filter(k=>q.opts[k]);
   const typeTag = q.isMultiple ? '<span style="font-size:11px;color:var(--err);background:#fef2f2;padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600">多选</span>' : '';
   return `<div class="q-card" id="pqc${gi}">
-    <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${esc(q.content)}${typeTag}</span></div>
+    <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${safeHtml(q.content)}${typeTag}</span></div>
     <div class="q-sc">${q.score}分${q.isMultiple?' &nbsp;·&nbsp; 多选题，可选多项':''}</div>
     <div class="choices">${opts.map(k=>`
       <label class="ch" style="cursor:default">
-        <input type="${q.isMultiple?'checkbox':'radio'}" name="pq${gi}" value="${k}" disabled><span><b>${k}.</b> ${esc(q.opts[k])}</span>
+        <input type="${q.isMultiple?'checkbox':'radio'}" name="pq${gi}" value="${k}" disabled><span><b>${k}.</b> ${safeHtml(q.opts[k])}</span>
       </label>`).join('')}</div>
   </div>`;
 }
@@ -7902,7 +8114,7 @@ function renderPreviewFill(q, gi, num){
       inlineHtml += `<span>${esc(p)}</span>`;
     }
   });
-  if(n === 0) inlineHtml = esc(q.content);
+  if(n === 0) inlineHtml = safeHtml(q.content);
 
   return `<div class="q-card" id="pqc${gi}">
     <div class="q-text"><span class="q-num">${num}</span><span style="line-height:2.2">${inlineHtml}</span></div>
@@ -7913,7 +8125,7 @@ function renderPreviewFill(q, gi, num){
 
 function renderPreviewEssay(q, gi, num){
   return `<div class="q-card" id="pqc${gi}">
-    <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${esc(q.content)}</span></div>
+    <div class="q-text"><span class="q-num">${num}</span><span style="line-height:1.7">${safeHtml(q.content)}</span></div>
     <div class="q-sc">${q.score}分</div>
     <textarea class="fill-inp" rows="5" style="margin-top:10px;background:#f8fafc" placeholder="（考生在此输入答案）" disabled></textarea>
   </div>`;
@@ -8535,28 +8747,27 @@ function renderGradeTab(defer){
       }
     }
 
-    // 填充考试场次checkbox列表
-    const examListEl=document.getElementById('grade-exam-list');
-    if(examListEl){
+    // 填充考试场次下拉菜单（支持多选）
+    const examSel=document.getElementById('grade-exam-sel');
+    if(examSel){
       const exams=[...examSet].sort();
-      if(exams.length===0){
-        examListEl.innerHTML='<div style="color:var(--muted);font-size:11px;padding:2px 0">暂无考试数据</div>';
-      } else {
-        const prevChecked=new Set([...examListEl.querySelectorAll('.grade-exam-chk:checked')].map(el=>el.value));
-        examListEl.innerHTML=exams.map(exam=>{
-          const checked=prevChecked.has(exam)?' checked':'';
-          return `<label style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap" onmouseover="this.style.background='#f0fdf4'" onmouseout="this.style.background=''">
-            <input type="checkbox" class="grade-exam-chk" value="${esc(exam)}" ${checked} onchange="onGradeFilterChange()">
-            <span>${esc(exam)}</span>
-          </label>`;
+      // 保留已选中的值
+      const prevSelected=new Set([...examSel.selectedOptions].map(o=>o.value));
+      // 重建 options
+      examSel.innerHTML='<option value="" disabled>— 选择考试场次（Ctrl+点击多选） —</option>'+
+        exams.map(exam=>{
+          // 若之前无选择，默认选中最新一场（排序后最后一场）
+          const shouldCheck = prevSelected.size>0 ? prevSelected.has(exam) : (exam===exams[exams.length-1]);
+          return `<option value="${esc(exam)}" ${shouldCheck?'selected':''}>${esc(exam)}</option>`;
         }).join('');
-        updateExamSelCnt();
-      }
+      updateExamSelCnt();
     }
 
-    // ── 获取当前筛选条件（从checkbox读取） ──
+    // ── 获取当前筛选条件 ──
     const selectedStus=new Set([...(document.querySelectorAll('.grade-stu-chk:checked')||[])].map(el=>el.value));
-    const selectedExams=new Set([...(document.querySelectorAll('.grade-exam-chk:checked')||[])].map(el=>el.value));
+    const examSel2=document.getElementById('grade-exam-sel');
+    const selectedExams=new Set(examSel2?[...examSel2.selectedOptions].filter(o=>o.value).map(o=>o.value):[]);
+    const selectedExamList=[...selectedExams]; // 保持选中顺序的数组
 
     // 应用双重筛选 + 权限过滤（myExamNames 已在上方声明）
     const filtered=keys.filter(sid=>{
@@ -8587,44 +8798,135 @@ function renderGradeTab(defer){
     }
     if(noSub) noSub.style.display='none';
 
-    tbody.innerHTML=filtered.map((sid,idx)=>{
-      const s=subs[sid];
-      const isImported = s.importedGrades === true;
-      const fillTot = typeof s.fillAutoScore === 'object' && s.fillAutoScore !== null ? (s.fillAutoScore.total || 0) : (s.fillAutoScore || 0);
-      const essayTot = typeof s.essayAutoScore === 'object' && s.essayAutoScore !== null ? (s.essayAutoScore.total || 0) : (s.essayAutoScore || 0);
-      const autoTotal=s.autoTotal??(s.choiceScore+fillTot+essayTot);
-      const final=s.finalScore;
-      const diff=final!==null?(final-autoTotal):null;
-      // 导入成绩：智能分和差值显示灰色 —
-      const autoStr = isImported ? '<span style="color:var(--muted)">—</span>' : `<b>${autoTotal}</b>分`;
-      const diffStr = isImported ? '<span style="color:var(--muted)">—</span>'
-        : (diff===null?'—':(diff===0?'±0':(diff>0?`+${diff}`:`${diff}`)));
-      const diffColor = isImported ? '' : (diff===null?'':(diff==0?'#16a34a':diff>0?'#dc2626':'#16a34a'));
-      const diffBg = isImported ? '' : (diff===null?'':(diff==0?'#dcfce7':diff>0?'#fee2e2':'#dcfce7'));
-      const status=isImported ? '<span class="badge b-gray">已导入</span>'
-        : (final!==null?'<span class="badge b-green">已完成</span>':'<span class="badge b-yellow">待复核</span>');
-      const finalStr=final!==null?`<b style="color:${isImported?'var(--pri)':'var(--pri)'}">${final}分</b>`:'—';
-      return `<tr>
-        <td><input type="checkbox" class="sub-row-ck" data-sid="${sid}" onchange="onSubCheckChange()"></td>
-        <td>${idx+1}</td>
-        <td>${esc(s.stu?.name||'')}（${esc(s.stu?.id||sid)}）</td>
-        <td>${esc(s.examName||'')}</td>
-        <td>${autoStr}</td>
-        <td>${status} ${finalStr}</td>
-        <td style="${diffBg?'background:'+diffBg+';':''}"><b style="color:${diffColor}">${diffStr}</b></td>
-        <td>
-          <button class="btn btn-pri btn-sm" data-action="grade" data-sid="${sid}">✍️ ${final!==null?'查看':'阅卷'}</button>
-          <button class="btn btn-sec btn-sm" data-action="retake" data-sid="${sid}" title="清除此考生的答卷记录，允许其重新参加该考试">🔄 允许重考</button>
-          <button class="btn btn-err btn-sm" data-action="delete" data-sid="${sid}" title="删除此答卷记录（不可恢复）">🗑 删除</button>
-        </td>
-      </tr>`;
-    }).join('');
+    // ── 构建学生×考试矩阵 ──
+    // 按学生分组，每个学生一行，每场考试为列
+    const stuRowMap = new Map(); // key: stuId, value: { info: {id,name}, exams: Map<examName, {sub, sid}> }
+    filtered.forEach(sid => {
+      const s = subs[sid];
+      if(!s || !s.stu?.id) return;
+      let entry = stuRowMap.get(s.stu.id);
+      if(!entry){ entry = { info: {id: s.stu.id, name: s.stu.name||''}, exams: new Map() }; stuRowMap.set(s.stu.id, entry); }
+      entry.exams.set(s.examName||'', {sub: s, sid});
+    });
+    
+    // ── 单场考试模式：恢复原始界面（与之前版本一致） ──
+    if(selectedExamList.length <= 1){
+      const thead = document.getElementById('grade-thead');
+      if(thead) thead.innerHTML = '<tr><th style="width:36px"><input type="checkbox" id="ck-all-subs" onchange="toggleAllSubmissions(this.checked)"></th><th>#</th><th>考生</th><th>考试</th><th style="text-align:center" data-sort-col="4" onclick="sortGradeTable(this)" style="cursor:pointer;user-select:none">智能预估 <span class="sort-arrow"></span></th><th style="text-align:center" data-sort-col="5" onclick="sortGradeTable(this)" style="cursor:pointer;user-select:none">最终成绩 <span class="sort-arrow"></span></th><th style="text-align:center" data-sort-col="6" onclick="sortGradeTable(this)" style="cursor:pointer;user-select:none">差值 <span class="sort-arrow"></span></th><th>操作</th></tr>';
+      
+      tbody.innerHTML = filtered.map((sid, idx) => {
+        const s = subs[sid];
+        const isImported = s.importedGrades === true;
+        const fillTot = typeof s.fillAutoScore === 'object' && s.fillAutoScore !== null ? (s.fillAutoScore.total || 0) : (s.fillAutoScore || 0);
+        const essayTot = typeof s.essayAutoScore === 'object' && s.essayAutoScore !== null ? (s.essayAutoScore.total || 0) : (s.essayAutoScore || 0);
+        const autoTotal = s.autoTotal ?? (s.choiceScore + fillTot + essayTot);
+        const fin = s.finalScore;
+        const diff = fin !== null ? (fin - autoTotal) : null;
+        const autoStr = isImported ? '<span style="color:var(--muted)">—</span>' : `<b>${autoTotal}</b>分`;
+        const diffStr = isImported ? '<span style="color:var(--muted)">—</span>'
+          : (diff === null ? '—' : (diff === 0 ? '±0' : (diff > 0 ? `+${diff}` : `${diff}`)));
+        const diffColor = isImported ? '' : (diff === null ? '' : (diff == 0 ? '#16a34a' : diff > 0 ? '#dc2626' : '#16a34a'));
+        const diffBg = isImported ? '' : (diff === null ? '' : (diff == 0 ? '#dcfce7' : diff > 0 ? '#fee2e2' : '#dcfce7'));
+        const finalStr = fin !== null ? `<b style="color:var(--pri)">${fin}分</b>` : '—';
+        return `<tr>
+          <td><input type="checkbox" class="sub-row-ck" data-sid="${sid}" onchange="onSubCheckChange()"></td>
+          <td>${idx+1}</td>
+          <td>${esc(s.stu?.name||'')}（${esc(s.stu?.id||sid)}）</td>
+          <td>${esc(s.examName||'')}</td>
+          <td>${autoStr}</td>
+          <td>${finalStr}</td>
+          <td style="${diffBg?'background:'+diffBg+';':''}"><b style="color:${diffColor}">${diffStr}</b></td>
+          <td>
+            <button class="btn btn-pri btn-sm" data-action="grade" data-sid="${sid}">✍️ 阅卷</button>
+            <button class="btn btn-sec btn-sm" data-action="retake" data-sid="${sid}" title="清除此考生的答卷记录，允许其重新参加该考试">🔄 允许重考</button>
+            <button class="btn btn-err btn-sm" data-action="delete" data-sid="${sid}" title="删除此答卷记录（不可恢复）">🗑 删除</button>
+          </td>
+        </tr>`;
+      }).join('');
+    } else {
+      // ── 多场考试模式：学生×考试矩阵 ──
+      const thead = document.getElementById('grade-thead');
+      let thHtml = '<tr><th style="width:36px"><input type="checkbox" id="ck-all-subs" onchange="toggleAllSubmissions(this.checked)"></th><th>#</th><th style="min-width:100px">考生</th>';
+      selectedExamList.forEach((exam, i) => {
+        const scoreCol = 3 + i * 2;
+        thHtml += `<th style="background:#f0fdf4;min-width:60px;text-align:center;cursor:pointer;user-select:none" data-sort-col="${scoreCol}" onclick="sortGradeTable(this)">${esc(exam)}<br><span style="font-size:10px;color:var(--muted);font-weight:400">成绩 <span class="sort-arrow"></span></span></th>`;
+        thHtml += `<th style="background:#f0fdf4;min-width:70px;text-align:center">${esc(exam)}<br><span style="font-size:10px;color:var(--muted);font-weight:400">操作</span></th>`;
+      });
+      const avgCol = 3 + selectedExamList.length * 2;
+      thHtml += `<th style="background:#eff6ff;min-width:60px;text-align:center;cursor:pointer;user-select:none" data-sort-col="${avgCol}" onclick="sortGradeTable(this)">平均分<br><span style="font-size:10px;color:var(--muted);font-weight:400">（考试）<span class="sort-arrow"></span></span></th></tr>`;
+      if(thead) thead.innerHTML = thHtml;
+
+      const students = [...stuRowMap.values()];
+      tbody.innerHTML = students.map((entry, idx) => {
+        const stu = entry.info;
+        let primarySid = '';
+        for(const [en, ed] of entry.exams){
+          if(!primarySid){ primarySid = ed.sid; }
+        }
+
+        let row = `<tr>
+          <td><input type="checkbox" class="sub-row-ck" data-sid="${primarySid}" onchange="onSubCheckChange()"></td>
+          <td>${idx+1}</td>
+          <td><b>${esc(stu.name)}</b><br><span style="font-size:10px;color:var(--muted)">${esc(stu.id)}</span></td>`;
+
+        let rowScores = []; // 收集所有考试的成绩用于计算平均分
+        selectedExamList.forEach(exam => {
+          const ed = entry.exams.get(exam);
+          if(!ed){
+            row += '<td style="color:var(--muted);text-align:center">—</td><td style="text-align:center">—</td>';
+            rowScores.push(null);
+          } else {
+            const s = ed.sub;
+            const autoTotal = s.autoTotal ?? (s.choiceScore||0) + 
+              (s.fillAutoScore && typeof s.fillAutoScore==='object'?s.fillAutoScore.total||0:(s.fillAutoScore||0)) +
+              (s.essayAutoScore && typeof s.essayAutoScore==='object'?s.essayAutoScore.total||0:(s.essayAutoScore||0));
+            const fin = s.finalScore;
+            const isImported = s.importedGrades === true;
+            const scoreVal = fin !== null ? fin : autoTotal;
+            const statusHtml = isImported ? '<span class="badge b-gray" style="font-size:10px">已导入</span>'
+              : (fin !== null ? '<span class="badge b-green" style="font-size:10px">已复核</span>' : '<span class="badge b-yellow" style="font-size:10px">待复核</span>');
+            // 成绩列：分数 + 状态badge，可点击进入阅卷
+            row += `<td style="text-align:center;cursor:pointer" onclick="openGrade('${ed.sid}')" title="点击进入阅卷">
+              <b style="color:var(--pri)">${scoreVal}</b>分 ${statusHtml}</td>`;
+            // 每场操作：紧凑按钮（覆盖 .btn-pri 的 width:100%）
+            row += `<td style="white-space:nowrap;text-align:center;font-size:0;line-height:1">
+              <button class="btn btn-pri btn-sm" style="display:inline-flex;width:auto;min-width:32px;padding:2px 6px;font-size:12px;flex-shrink:0;margin:0" data-action="grade" data-sid="${ed.sid}" title="阅卷">✍️</button>
+              <button class="btn btn-sec btn-sm" style="display:inline-flex;width:auto;min-width:32px;padding:2px 6px;font-size:12px;flex-shrink:0;margin:0" data-action="retake" data-sid="${ed.sid}" title="允许重考">🔄</button>
+              <button class="btn btn-err btn-sm" style="display:inline-flex;width:auto;min-width:32px;padding:2px 6px;font-size:12px;flex-shrink:0;margin:0" data-action="delete" data-sid="${ed.sid}" title="删除">🗑</button>
+            </td>`;
+            rowScores.push(scoreVal);
+          }
+        });
+
+        // 平均分：已参加考试的成绩取平均，保留1位小数
+        const validScores = rowScores.filter(v => v !== null);
+        const avg = validScores.length > 0 
+          ? (validScores.reduce((a,b) => a+b, 0) / validScores.length).toFixed(1)
+          : '—';
+        row += `<td style="text-align:center;background:#eff6ff"><b style="color:#2563eb;font-size:14px">${avg}</b><span style="font-size:11px;color:var(--muted)">分</span></td>`;
+
+        row += '</tr>';
+        return row;
+      }).join('');
+    }
 
     // 更新全选框状态
     const ckAll=document.getElementById('ck-all-subs');
     const cks=tbody.querySelectorAll('.sub-row-ck');
     if(ckAll) ckAll.checked=cks.length>0 && [...cks].every(c=>c.checked);
     updateBatchBtn();
+
+    // 恢复排序状态（如果之前有排序）
+    const prevSort = window._gradeSort;
+    if(prevSort && prevSort.col !== undefined && prevSort.dir && prevSort.dir !== 'none'){
+      const th = document.querySelector(`#grade-thead th[data-sort-col="${prevSort.col}"]`);
+      if(th){
+        th.dataset.sortDir = prevSort.dir === 'asc' ? 'desc' : 'asc'; // sortGradeTable 会翻转，先设反向让它翻回来
+        th.click(); // 手动触发排序恢复
+      }
+    } else {
+      delete window._gradeSort;
+    }
   };
   if(defer){ (window.requestAnimationFrame||setTimeout)(doRender, 0); } else { doRender(); }
 }
@@ -8639,6 +8941,12 @@ function onGradeFilterChange(){
   updateExamSelCnt();
 }
 
+/** 考试下拉选择变化时触发表格重渲染 */
+function onExamSelChange(){
+  updateExamSelCnt();
+  doGradeQuery();
+}
+
 /** 更新考生已选人数显示 */
 function updateStuSelCnt(){
   const cnt=document.querySelectorAll('.grade-stu-chk:checked').length;
@@ -8648,7 +8956,8 @@ function updateStuSelCnt(){
 
 /** 更新考试已选场次数显示 */
 function updateExamSelCnt(){
-  const cnt=document.querySelectorAll('.grade-exam-chk:checked').length;
+  const sel=document.getElementById('grade-exam-sel');
+  const cnt=sel?[...sel.selectedOptions].filter(o=>o.value).length:0;
   const el=document.getElementById('grade-exam-sel-cnt');
   if(el) el.textContent=cnt;
 }
@@ -8662,13 +8971,15 @@ function toggleAllStudents(btn){
   updateStuSelCnt();
 }
 
-/** 考试场次全选/取消 */
+/** 考试场次全选/取消（操作下拉菜单） */
 function toggleAllExams(btn){
-  const chks=document.querySelectorAll('.grade-exam-chk');
-  const allChecked=[...chks].every(c=>c.checked);
-  chks.forEach(c=>c.checked=!allChecked);
-  btn.textContent=allChecked?'✅ 全部场次':'☐ 取消全部';
+  const sel=document.getElementById('grade-exam-sel');
+  if(!sel) return;
+  const allSelected = [...sel.options].filter(o=>o.value).every(o=>o.selected);
+  [...sel.options].forEach(o=>{ if(o.value) o.selected = !allSelected; });
+  btn.textContent = allSelected ? '✅ 全部场次' : '☐ 取消全部';
   updateExamSelCnt();
+  doGradeQuery();
 }
 
 /** 🔍 查询按钮：触发表格渲染 */
@@ -8686,7 +8997,8 @@ function exportGradeMatrix(){
 
   // 获取当前筛选条件
   const selectedStus=new Set([...(document.querySelectorAll('.grade-stu-chk:checked')||[])].map(el=>el.value));
-  const selectedExams=new Set([...(document.querySelectorAll('.grade-exam-chk:checked')||[])].map(el=>el.value));
+  const examSel=document.getElementById('grade-exam-sel');
+  const selectedExams=new Set(examSel?[...examSel.selectedOptions].filter(o=>o.value).map(o=>o.value):[]);
 
   if(keys.length===0){
     toast('暂无答卷数据可导出','warn'); return;
@@ -8820,6 +9132,57 @@ function updateBatchBtn(){
   if(cnt) cnt.textContent=cks.length;
 }
 
+// ★ 表格列排序（点击成绩列表头）
+function sortGradeTable(th){
+  const col = parseInt(th.dataset.sortCol);
+  if(isNaN(col)) return;
+  const tbody = document.getElementById('t-grade');
+  if(!tbody) return;
+  const rows = [...tbody.querySelectorAll('tr')];
+  if(rows.length < 2) return;
+  
+  // 切换排序方向：asc → desc → 还原
+  let dir = th.dataset.sortDir;
+  if(!dir || dir === 'none'){ dir = 'asc'; }
+  else if(dir === 'asc'){ dir = 'desc'; }
+  else { dir = 'none'; }
+  
+  // 清除所有排序箭头
+  document.querySelectorAll('#grade-thead .sort-arrow').forEach(el => el.textContent = '');
+  document.querySelectorAll('#grade-thead th[data-sort-dir]').forEach(el => delete el.dataset.sortDir);
+  
+  if(dir === 'none'){
+    // 还原：按原始顺序
+    rows.forEach(r => tbody.appendChild(r));
+    delete th.dataset.sortDir;
+    delete window._gradeSort;
+    return;
+  }
+  
+  th.dataset.sortDir = dir;
+  const arrow = th.querySelector('.sort-arrow');
+  if(arrow) arrow.textContent = dir === 'asc' ? '↑' : '↓';
+  
+  // 提取单元格数值
+  const getVal = (row) => {
+    const cell = row.children[col];
+    if(!cell) return -Infinity;
+    const text = (cell.textContent || '').trim().replace(/[^\d.\-—]/g, '');
+    if(text === '—' || text === '') return -Infinity;
+    return parseFloat(text) || -Infinity;
+  };
+  
+  // 排序（stable sort: 用索引辅助）
+  const indexed = rows.map((r, i) => ({r, v: getVal(r), i}));
+  indexed.sort((a, b) => {
+    if(dir === 'asc') return a.v - b.v || a.i - b.i;
+    return b.v - a.v || a.i - b.i;
+  });
+  
+  indexed.forEach(({r}) => tbody.appendChild(r));
+  window._gradeSort = {col, dir};
+}
+
 // 删除单条答卷
 function deleteSubmission(sid){
   const s=getSubByKey(sid);
@@ -8883,7 +9246,7 @@ function openGrade(sid){
   const sub=getSubByKey(sid);
   if(!sub){
     toast('❌ 未找到答卷数据，可能是导入的数据格式有问题','err');
-    console.error('阅卷失败 - sid:', sid, 'sub:', sub, 'DB.submissions keys:', Object.keys(subs));
+    console.error('阅卷失败 - sid:', sid, 'sub:', sub, 'DB.submissions keys:', Object.keys(DB.submissions));
     return;
   }
   S.gradingStu=sid;
@@ -8966,7 +9329,7 @@ function openGrade(sid){
       const showUser = ua ? ua.replace(/[,，\s]/g,'、') : '未作答';
       const showCorrect = Array.isArray(q.answer) ? q.answer.join('、') : (q.answer || '');
       html+=`<div style="padding:12px;border-radius:8px;margin-bottom:8px;background:${ok?'#f0fdf4':'#fef2f2'};border:1px solid ${ok?'#86efac':'#fca5a5'}">
-        <div style="font-size:14px;margin-bottom:4px"><span class="badge ${ok?'b-green':'b-red'}">${ok?'✓ 正确':'✗ 错误'}</span> 第${i+1}题（${q.score}分）${esc(q.content)}</div>
+        <div style="font-size:14px;margin-bottom:4px"><span class="badge ${ok?'b-green':'b-red'}">${ok?'✓ 正确':'✗ 错误'}</span> 第${i+1}题（${q.score}分）${safeHtml(q.content)}</div>
         <div class="fs13 fc-muted">考生答案：<b>${showUser}</b> | 正确答案：<b style="color:var(--ok)">${showCorrect}</b></div>
         ${customRule !== null ? `<div class="fs12" style="margin-top:4px;color:#7c3aed">📐 规则得分：${autoSc}分</div>` : ''}
       </div>`;
@@ -8988,10 +9351,10 @@ function openGrade(sid){
         :(suggestFill>0?`<span class="badge b-green" style="margin-left:4px">✓ 智能建议：${suggestFill}分</span>`
         :(ua?`<span class="badge b-red" style="margin-left:4px">✗ 智能建议：0分</span>`:''));
       html+=`<div style="padding:14px;border:1.5px solid ${isCustom?'#7c3aed':'var(--border)'};border-radius:8px;margin-bottom:12px">
-        <div class="fw7" style="margin-bottom:8px">第${i+1}题（${q.score}分）${esc(q.content)}</div>
+        <div class="fw7" style="margin-bottom:8px">第${i+1}题（${q.score}分）${safeHtml(q.content)}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-          <div style="background:#f8fafc;padding:10px;border-radius:6px;font-size:13px"><div class="fc-muted mb2">考生答案</div>${ua?esc(ua):'<span class="fc-muted">未作答</span>'}</div>
-          <div style="background:#f0fdf4;padding:10px;border-radius:6px;font-size:13px"><div class="fc-muted mb2">参考答案</div><span style="color:var(--ok)">${esc(q.answer)}</span></div>
+          <div style="background:#f8fafc;padding:10px;border-radius:6px;font-size:13px"><div class="fc-muted mb2">考生答案</div>${ua?safeHtml(ua):'<span class="fc-muted">未作答</span>'}</div>
+          <div style="background:#f0fdf4;padding:10px;border-radius:6px;font-size:13px"><div class="fc-muted mb2">参考答案</div><span style="color:var(--ok)">${safeHtml(q.answer)}</span></div>
         </div>
         <div class="flex aic gap2 fs13">评分：
           <input type="number" id="gs_f${gi}" value="${stored!==null?stored:suggestFill}" min="0" max="${q.score}" step="0.5" style="width:70px">
@@ -9009,8 +9372,9 @@ function openGrade(sid){
     essays.forEach((q,i)=>{
       const ua=sub.ans[gi]||'';
       const kws=(q.keywords||'').split(',').map(k=>k.trim()).filter(Boolean);
-      const hit=kws.filter(k=>ua.toLowerCase().includes(k.toLowerCase()));
-      const miss=kws.filter(k=>!ua.toLowerCase().includes(k.toLowerCase()));
+      // 支持 | (OR) / && (AND) 语法，与评分规则保持一致
+      const hit=kws.filter(k=>checkKeywordsHit(k, ua));
+      const miss=kws.filter(k=>!checkKeywordsHit(k, ua));
       const customScore=checkCustomRule(q,ua);  // 优先：人工规则
       const autoS=customScore!==null?customScore:smartEssayScore(q,ua);
       const isCustom=customScore!==null;
@@ -9020,14 +9384,14 @@ function openGrade(sid){
         :(autoS>0?`<span class="badge b-green" style="margin-left:4px">✓ 智能建议：${autoS}分</span>`
         :(ua?`<span class="badge b-yellow" style="margin-left:4px">? 智能建议：0分（请人工复核）</span>`:''));
       html+=`<div style="padding:16px;border:1.5px solid ${isCustom?'#7c3aed':'var(--border)'};border-radius:8px;margin-bottom:14px">
-        <div class="fw7" style="margin-bottom:10px">第${i+1}题（${q.score}分）${esc(q.content)}</div>
+        <div class="fw7" style="margin-bottom:10px">第${i+1}题（${q.score}分）${safeHtml(q.content)}</div>
         <div style="margin-bottom:10px">
           <div class="fs13 fc-muted mb2">考生答案：</div>
-          <div style="white-space:pre-wrap;padding:10px 14px;background:#f8fafc;border-radius:8px;font-size:14px;line-height:1.8;max-height:130px;overflow-y:auto;border:1px solid var(--border)">${esc(ua)||'<span class="fc-muted">未作答</span>'}</div>
+          <div style="white-space:pre-wrap;padding:10px 14px;background:#f8fafc;border-radius:8px;font-size:14px;line-height:1.8;max-height:130px;overflow-y:auto;border:1px solid var(--border)">${safeHtml(ua)||'<span class="fc-muted">未作答</span>'}</div>
         </div>
         <div style="margin-bottom:10px">
           <div class="fs13 fc-muted mb2">参考答案：</div>
-          <div style="white-space:pre-wrap;padding:10px 14px;background:#f0fdf4;border-radius:8px;font-size:14px;line-height:1.8;max-height:100px;overflow-y:auto;color:#166534">${esc(q.refAns||'')}</div>
+          <div style="white-space:pre-wrap;padding:10px 14px;background:#f0fdf4;border-radius:8px;font-size:14px;line-height:1.8;max-height:100px;overflow-y:auto;color:#166534">${safeHtml(q.refAns||'')}</div>
         </div>
         <div class="fs13 mb2">
           <span class="fc-muted">关键词命中：</span>
@@ -9168,7 +9532,7 @@ function submitGrade(){
   sub.autoTotal = newChoiceScore + pureAutoFillTotal + pureAutoEssayTotal;
   // 最终成绩 = 选择题 + 填空题(含教师分) + 简答题(含教师分)
   sub.finalScore = newChoiceScore + newFillScore + newEssayScore;
-  DB.submissions=subs;
+  // sub 已是 DB.submissions 的对象引用，无需重新赋值
   closeM('m-grade');
   renderGradeTab();
   toast(`✅ 评分完成！${sub.stu.name} 最终得分：${sub.finalScore} 分`,'ok');
@@ -9387,7 +9751,14 @@ function doCompare(){
   const selIds=[...document.querySelectorAll('.cmp-chk:checked')].map(el=>el.value);
   if(selIds.length<2){ toast('⚠️ 请至少选择2名考生进行对比','err'); return; }
   const subs=DB.submissions;
-  const students=selIds.map(id=>subs[id]).filter(Boolean);
+  // 使用复合键查找答卷（studentId_examId）
+  const students=selIds.map(id=>{
+    const sk = subKey(id, examId);
+    if(subs[sk]) return subs[sk];
+    // 向后兼容：回退到单键查找
+    if(subs[id] && String(subs[id].examId)===String(examId)) return subs[id];
+    return null;
+  }).filter(Boolean);
   const qs=DB.questions.filter(q=>{
     if(!q.examId&&!examId) return true;
     if(examId) return String(q.examId)===String(examId);
@@ -9552,7 +9923,7 @@ function renderCompareRow(q, seq, qi, stat, students, stuScoreMaps){
   let html=`<tr>
     <td style="padding:8px 10px;border:1px solid #e2e8f0;position:sticky;left:0;background:white;font-weight:700;min-width:60px;z-index:1">${seq}</td>
     <td style="padding:8px 10px;border:1px solid #e2e8f0;position:sticky;left:60px;background:white;z-index:1"><span class="badge ${q.type==='choice'?'b-blue':q.type==='fill'?'b-green':'b-yellow'}">${typeNames[q.type]||q.type}</span></td>
-    <td style="padding:8px 10px;border:1px solid #e2e8f0;position:sticky;left:130px;background:white;z-index:1;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(q.content)}${q.type==='choice'&&q.opts?'\n选项：'+Object.entries(q.opts).filter(([,v])=>v).map(([k,v])=>k+'. '+v).join('  '):''}">${esc(q.content)}</td>
+    <td style="padding:8px 10px;border:1px solid #e2e8f0;position:sticky;left:130px;background:white;z-index:1;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(q.content)}${q.type==='choice'&&q.opts?'\n选项：'+Object.entries(q.opts).filter(([,v])=>v).map(([k,v])=>k+'. '+v).join('  '):''}">${safeHtml(q.content)}</td>
     <td style="padding:8px 10px;text-align:center;border:1px solid #e2e8f0;background:${rateBg};font-weight:700;color:${rateColor}">${stat.rate}%</td>
     <td style="padding:8px 10px;text-align:center;border:1px solid #e2e8f0;background:#dcfce7;color:#16a34a;font-weight:700">${stat.right}人</td>
     <td style="padding:8px 10px;text-align:center;border:1px solid #e2e8f0;background:#fee2e2;color:#dc2626;font-weight:700">${stat.wrong+stat.noAns}人</td>`;
@@ -11186,6 +11557,69 @@ function v(id){ const el=document.getElementById(id); return el?el.value:''; }
 function setText(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; }
 function setDot(id,state){ const el=document.getElementById(id); if(el){el.classList.toggle('on',state==='on');el.classList.toggle('off',state==='off');} }
 function esc(s){ return s?String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';}
+// ★ 安全 HTML 渲染：允许 <img> 标签（base64图片），其他全部转义
+function safeHtml(s){
+  if(!s) return '';
+  let escaped = esc(s);
+  // 还原被转义的 img 标签（只允许 src="data:image/..." 格式）
+  escaped = escaped.replace(/&lt;img\s+src="data:image\/[^"]*"\s*(?:\/)?\s*&gt;/g,
+    m => m.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"'));
+  return escaped;
+}
+// ★ 粘贴图片处理（通用）：事件对象 + 回调(textarea, imgTag)
+function handlePasteImg(e, onImg){
+  const items = (e.clipboardData || window.clipboardData)?.items;
+  if(!items) return false;
+  for(const item of items){
+    if(item.type.indexOf('image') !== -1){
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = ev => onImg(ev.target.result);
+      reader.readAsDataURL(blob);
+      e.preventDefault();
+      return true;
+    }
+  }
+  return false;
+}
+// ★ 文件上传转图片插入（通用）：触发 file input → 转 base64 → 回调
+function uploadImg(callback){
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
+  inp.onchange = () => {
+    const f = inp.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = ev => callback(ev.target.result);
+    reader.readAsDataURL(f);
+    inp.remove();
+  };
+  document.body.appendChild(inp);
+  inp.click();
+}
+// ★ 生成 img 标签 HTML（带统一 class）
+function imgTag(base64){
+  return `<img src="${base64}" class="q-img" style="max-width:100%;max-height:300px;border-radius:6px;margin:4px 0">`;
+}
+// ★ 将 base64 图片插入 textarea 光标位置
+function insertImgToTextarea(taId, base64){
+  const ta = document.getElementById(taId);
+  if(!ta) return;
+  const tag = imgTag(base64);
+  const start = ta.selectionStart;
+  const text = ta.value;
+  ta.value = text.substring(0, start) + tag + text.substring(ta.selectionEnd);
+  ta.selectionStart = ta.selectionEnd = start + tag.length;
+  ta.focus();
+}
+// ★ textarea paste 处理：检测图片→插入
+function handleTextareaPaste(e, taId){
+  handlePasteImg(e, base64 => insertImgToTextarea(taId, base64));
+}
+// ★ textarea 上传按钮：选文件→插入
+function uploadImg2Textarea(taId){
+  uploadImg(base64 => insertImgToTextarea(taId, base64));
+}
 
 function toast(msg,type='ok'){
   const old=document.getElementById('_toast');
