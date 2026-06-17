@@ -513,17 +513,13 @@ D.选项
           </div>
 
           <!-- 考试场次列表区 -->
-          <div style="flex:1;min-width:180px">
-            <select id="grade-exam-sel" multiple
-              style="width:100%;height:72px;padding:4px;border:1.5px solid #86efac;border-radius:6px;font-size:12px;background:#f0fdf4"
-              onchange="onExamSelChange()">
-              <option value="" disabled>— 选择考试场次（Ctrl+点击多选） —</option>
-            </select>
+          <div style="flex:1;min-width:180px;background:#dcfce7;border-radius:8px;padding:8px 10px;max-height:80px;overflow-y:auto">
+            <div id="grade-exam-list" style="display:flex;flex-wrap:wrap;gap:4px 14px;align-content:flex-start">
+              <div style="color:var(--muted);font-size:11px;padding:2px 0">暂无考试数据</div>
+            </div>
           </div>
             </div>
           </div>
-        </div>
-      </div>
 
       <!-- 查询/导出操作栏（待阅卷列表上方，右对齐） -->
       <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:10px">
@@ -8760,26 +8756,27 @@ function renderGradeTab(defer){
       }
     }
 
-    // 填充考试场次下拉菜单（支持多选）
-    const examSel=document.getElementById('grade-exam-sel');
+    // 填充考试场次复选框列表
+    const examSel=document.getElementById('grade-exam-list');
     if(examSel){
-      const exams=[...examSet].sort();
+      const exams=naturalSort([...examSet]);
       // 保留已选中的值
-      const prevSelected=new Set([...examSel.selectedOptions].map(o=>o.value));
-      // 重建 options
-      examSel.innerHTML='<option value="" disabled>— 选择考试场次（Ctrl+点击多选） —</option>'+
-        exams.map(exam=>{
-          // 若之前无选择，默认选中最新一场（排序后最后一场）
-          const shouldCheck = prevSelected.size>0 ? prevSelected.has(exam) : (exam===exams[exams.length-1]);
-          return `<option value="${esc(exam)}" ${shouldCheck?'selected':''}>${esc(exam)}</option>`;
-        }).join('');
+      const prevChecked=new Set([...examSel.querySelectorAll('.grade-exam-chk:checked')].map(el=>el.value));
+      examSel.innerHTML=exams.map(exam=>{
+        // 若之前无选择，默认选中最后一场
+        const shouldCheck = prevChecked.size>0 ? prevChecked.has(exam) : (exam===exams[exams.length-1]);
+        return `<label style="display:inline-flex;align-items:center;gap:4px;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap" onmouseover="this.style.background='#bbf7d0'" onmouseout="this.style.background=''">
+          <input type="checkbox" class="grade-exam-chk" value="${esc(exam)}" ${shouldCheck?'checked':''} onchange="onExamChkChange()">
+          <span>${esc(exam)}</span>
+        </label>`;
+      }).join('');
       updateExamSelCnt();
     }
 
     // ── 获取当前筛选条件 ──
     const selectedStus=new Set([...(document.querySelectorAll('.grade-stu-chk:checked')||[])].map(el=>el.value));
-    const examSel2=document.getElementById('grade-exam-sel');
-    const selectedExams=new Set(examSel2?[...examSel2.selectedOptions].filter(o=>o.value).map(o=>o.value):[]);
+    const examSel2=document.getElementById('grade-exam-list');
+    const selectedExams=new Set(examSel2?[...examSel2.querySelectorAll('.grade-exam-chk:checked')].map(el=>el.value):[]);
     const selectedExamList=[...selectedExams]; // 保持选中顺序的数组
 
     // 应用双重筛选 + 权限过滤（myExamNames 已在上方声明）
@@ -8955,7 +8952,7 @@ function onGradeFilterChange(){
 }
 
 /** 考试下拉选择变化时触发表格重渲染 */
-function onExamSelChange(){
+function onExamChkChange(){
   updateExamSelCnt();
   doGradeQuery();
 }
@@ -8969,8 +8966,7 @@ function updateStuSelCnt(){
 
 /** 更新考试已选场次数显示 */
 function updateExamSelCnt(){
-  const sel=document.getElementById('grade-exam-sel');
-  const cnt=sel?[...sel.selectedOptions].filter(o=>o.value).length:0;
+  const cnt=document.querySelectorAll('.grade-exam-chk:checked').length;
   const el=document.getElementById('grade-exam-sel-cnt');
   if(el) el.textContent=cnt;
 }
@@ -8984,19 +8980,41 @@ function toggleAllStudents(btn){
   updateStuSelCnt();
 }
 
-/** 考试场次全选/取消（操作下拉菜单） */
+/** 考试场次全选/取消（操作复选框列表） */
 function toggleAllExams(btn){
-  const sel=document.getElementById('grade-exam-sel');
-  if(!sel) return;
-  const allSelected = [...sel.options].filter(o=>o.value).every(o=>o.selected);
-  [...sel.options].forEach(o=>{ if(o.value) o.selected = !allSelected; });
-  btn.textContent = allSelected ? '✅ 全部场次' : '☐ 取消全部';
+  const chks=document.querySelectorAll('.grade-exam-chk');
+  const allChecked=[...chks].every(c=>c.checked);
+  chks.forEach(c=>c.checked=!allChecked);
+  btn.textContent=allChecked?'✅ 全部场次':'☐ 取消全部';
   updateExamSelCnt();
   doGradeQuery();
 }
 
 /** 🔍 查询按钮：触发表格渲染 */
 function doGradeQuery(){ renderGradeTab(); }
+
+/** 自然排序：按考试名称中的数字（中文或阿拉伯）排序 */
+function naturalSort(arr){
+  const cnNum={零:0,一:1,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10,百:100};
+  function parseNum(s){
+    // 优先解析中文数字（第X场）
+    const m1=s.match(/第([一二三四五六七八九十百]+)/);
+    if(m1){ const cn=m1[1]; let n=0;
+      if(cn.length===1){ n=cnNum[cn]||0; }
+      else if(cn==='十'){ n=10; }
+      else if(cn.startsWith('十')){ n=10+(cnNum[cn[1]]||0); }
+      else if(cn[1]==='十'){ n=(cnNum[cn[0]]||0)*10+(cnNum[cn[2]]||0); }
+      else { for(let i=0;i<cn.length;i++) n+=cnNum[cn[i]]||0; }
+      return n;
+    }
+    // 其次解析阿拉伯数字
+    const m2=s.match(/(\d+)/);
+    if(m2) return parseInt(m2[1]);
+    return 0;
+  }
+  const map=new Map(); arr.forEach(s=>map.set(s,parseNum(s)));
+  return arr.sort((a,b)=>(map.get(a)||0)-(map.get(b)||0)||a.localeCompare(b));
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  📥 Excel 成绩矩阵导出
@@ -9010,8 +9028,8 @@ function exportGradeMatrix(){
 
   // 获取当前筛选条件
   const selectedStus=new Set([...(document.querySelectorAll('.grade-stu-chk:checked')||[])].map(el=>el.value));
-  const examSel=document.getElementById('grade-exam-sel');
-  const selectedExams=new Set(examSel?[...examSel.selectedOptions].filter(o=>o.value).map(o=>o.value):[]);
+  const examSel=document.getElementById('grade-exam-list');
+  const selectedExams=new Set(examSel?[...examSel.querySelectorAll('.grade-exam-chk:checked')].map(el=>el.value):[]);
 
   if(keys.length===0){
     toast('暂无答卷数据可导出','warn'); return;
@@ -9033,7 +9051,7 @@ function exportGradeMatrix(){
   });
 
   const students=[...stuMap.values()];
-  const exams=[...examSet].sort();
+  const exams=naturalSort([...examSet]);
 
   if(students.length===0 || exams.length===0){
     toast('当前筛选条件下无数据可导出','warn'); return;
@@ -9060,17 +9078,21 @@ function exportGradeMatrix(){
 
   // 构建 AOA 数组（SheetJS aoa_to_sheet 格式）
   const aoa=[];
-  // 表头行
-  const header=['序号','姓名','学号',...exams];
+  // 表头行：序号、姓名、学号、各考试列、平均值
+  const header=['序号','姓名','学号',...exams,'平均分'];
   aoa.push(header);
 
   // 数据行
   students.forEach((stu,idx)=>{
     const row=[idx+1, stu.name, stu.id];
+    let sum=0, cnt=0;
     exams.forEach(exam=>{
       const score=scoreMap[stu.id+'::'+exam];
       row.push(score!==undefined?score:'—');
+      if(score!==undefined){ sum+=score; cnt++; }
     });
+    // 平均分列：保留1位小数
+    row.push(cnt>0?Math.round(sum/cnt*10)/10:'—');
     aoa.push(row);
   });
 
@@ -9083,7 +9105,8 @@ function exportGradeMatrix(){
       {wch:6},   // 序号
       {wch:12},  // 姓名
       {wch:14},  // 学号
-      ...exams.map(()=>({wch:14}))  // 各考试列
+      ...exams.map(()=>({wch:14})),  // 各考试列
+      {wch:10}   // 平均分
     ];
 
     const wb=XLSX.utils.book_new();
@@ -9341,8 +9364,22 @@ function openGrade(sid){
       }
       const showUser = ua ? ua.replace(/[,，\s]/g,'、') : '未作答';
       const showCorrect = Array.isArray(q.answer) ? q.answer.join('、') : (q.answer || '');
+      // 选项内容展示：正确项绿色✓，考生选错项红色✗，考生选对项绿色✅
+      const opts = q.opts || {};
+      const correctSet = new Set((q.answer||'').replace(/[,，\s]/g,'').toUpperCase().split(''));
+      const userSet = new Set((ua||'').replace(/[,，\s]/g,'').toUpperCase().split(''));
+      const optsHtml = Object.keys(opts).sort().map(k => {
+        const text = opts[k];
+        const isCorrect = correctSet.has(k);
+        const isUser = userSet.has(k);
+        if(isCorrect && isUser) return `<span style="color:#16a34a;font-weight:700;background:#dcfce7;padding:1px 5px;border-radius:3px">${k}. ${safeHtml(text)} ✅</span>`;
+        if(isCorrect && !isUser) return `<span style="color:#16a34a;background:#dcfce7;padding:1px 5px;border-radius:3px">${k}. ${safeHtml(text)} ✓</span>`;
+        if(!isCorrect && isUser) return `<span style="color:#dc2626;font-weight:700;background:#fef2f2;padding:1px 5px;border-radius:3px">${k}. ${safeHtml(text)} ✗</span>`;
+        return `<span style="color:var(--muted)">${k}. ${safeHtml(text)}</span>`;
+      }).join(' &nbsp;');
       html+=`<div style="padding:12px;border-radius:8px;margin-bottom:8px;background:${ok?'#f0fdf4':'#fef2f2'};border:1px solid ${ok?'#86efac':'#fca5a5'}">
         <div style="font-size:14px;margin-bottom:4px"><span class="badge ${ok?'b-green':'b-red'}">${ok?'✓ 正确':'✗ 错误'}</span> 第${i+1}题（${q.score}分）${safeHtml(q.content)}</div>
+        <div class="fs12" style="margin:6px 0;line-height:1.8">${optsHtml}</div>
         <div class="fs13 fc-muted">考生答案：<b>${showUser}</b> | 正确答案：<b style="color:var(--ok)">${showCorrect}</b></div>
         ${customRule !== null ? `<div class="fs12" style="margin-top:4px;color:#7c3aed">📐 规则得分：${autoSc}分</div>` : ''}
       </div>`;
@@ -9423,18 +9460,30 @@ function openGrade(sid){
 
   // 违规记录
   if(sub.cheatLog&&sub.cheatLog.length){
+    let videoBaseTs=null;
+    const ts=sub.cheatLog.map(e=>e.t).filter(t=>/\d{1,2}:\d{2}:\d{2}/.test(t));
+    if(ts.length>0){
+      const [h,m,s]=ts.sort()[0].split(':').map(Number);
+      const exam=getExamList().find(e=>String(e.id)===String(curId));
+      let ds='';
+      if(exam?.startTime){const d=new Date(exam.startTime.replace(/\//g,'-'));if(!isNaN(d))ds=d.toISOString().split('T')[0];}
+      if(!ds) ds=new Date().toISOString().split('T')[0];
+      const base=new Date(ds+'T00:00:00');base.setHours(h,m,s-5,0);
+      if(!isNaN(base)) videoBaseTs=base.getTime();
+    }
+    const off=t=>{if(!videoBaseTs)return'';const m=t.match(/(\d{1,2}):(\d{2}):(\d{2})/);if(!m)return'';const e=new Date(videoBaseTs);e.setHours(+m[1],+m[2],+m[3],0);const s=Math.round((e-videoBaseTs)/1000);if(s<0)return'';return'（视频第'+Math.floor(s/60)+'分'+s%60+'秒）';};
     const hardViolations=sub.cheatLog.filter(l=>l.type.includes('【人脸检测】')||l.type.includes('【设备检测】'));
     const softWarnings=sub.cheatLog.filter(l=>!l.type.includes('【人脸检测】')&&!l.type.includes('【设备检测】'));
     const hardCount=hardViolations.length, softCount=softWarnings.length;
     let logHtml='';
     if(hardCount>0){
       logHtml+=`<div style="color:#dc2626;font-weight:700;margin-bottom:4px">🔴 严重违规（${hardCount}条）</div>`;
-      logHtml+=hardViolations.map(l=>`<div class="fs13" style="color:#7f1d1d;padding:2px 0;border-bottom:1px solid #fecaca">[${l.t}] ${esc(l.type)}</div>`).join('');
+      logHtml+=hardViolations.map(l=>`<div class="fs13" style="color:#7f1d1d;padding:2px 0;border-bottom:1px solid #fecaca">[${l.t}] ${esc(l.type)} <span style="color:#b91c1c;font-weight:600">${off(l.t)}</span></div>`).join('');
     }
     if(softCount>0){
       if(hardCount>0) logHtml+='<div style="height:6px"></div>';
       logHtml+=`<div style="color:#d97706;font-weight:700;margin-bottom:4px">⚠️ 一般警告（${softCount}条）</div>`;
-      logHtml+=softWarnings.map(l=>`<div class="fs13" style="color:#92400e;padding:2px 0;border-bottom:1px solid #fde68a">[${l.t}] ${esc(l.type)}</div>`).join('');
+      logHtml+=softWarnings.map(l=>`<div class="fs13" style="color:#92400e;padding:2px 0;border-bottom:1px solid #fde68a">[${l.t}] ${esc(l.type)} <span style="color:#92400e;font-weight:600">${off(l.t)}</span></div>`).join('');
     }
     html+=`<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:14px;margin-top:6px">
       <div class="fw7" style="color:var(--err);margin-bottom:8px">⚠️ 监控异常记录（${sub.cheatLog.length}条）</div>
@@ -10286,6 +10335,12 @@ async function openPlayback(examId,studentId,type){
     </div>
   </div>`;
   viewer.scrollIntoView({behavior:'smooth'});
+  // 作弊标记数据
+  {
+    const sk=subKey(studentId,examId);
+    const sub=DB.submissions[sk];
+    if(sub){loadCheatForPlayback(sub,examId);}
+  }
   try {
     const res=await fetch(`/api/recordings/${examId}/${studentId}`);
     const data=await res.json();
@@ -10316,8 +10371,9 @@ async function openPlayback(examId,studentId,type){
           <button id="cust-play-btn" class="btn btn-pri btn-sm" onclick="custTogglePlay()" style="width:auto;min-width:32px;padding:3px 8px;font-size:13px">▶</button>
           <button onclick="custSkip(-5)" title="后退5秒" style="background:none;border:none;color:#fff;font-size:14px;cursor:pointer;padding:2px 4px;border-radius:4px">⏪</button>
           <span id="cust-time" style="color:#fff;font-size:11px;min-width:80px">0:00 / 0:00</span>
-          <div id="cust-progress" onclick="custSeek(event)" style="flex:1;min-width:60px;height:5px;background:rgba(255,255,255,0.25);border-radius:3px;cursor:pointer;position:relative">
-            <div id="cust-progress-bar" style="height:100%;background:var(--pri,#4CAF50);border-radius:3px;width:0%;transition:width 0.1s"></div>
+          <div id="cust-progress" onclick="custSeek(event)" style="flex:1;min-width:60px;height:14px;background:rgba(255,255,255,0.25);border-radius:3px;cursor:pointer;position:relative">
+            <div id="cust-progress-bar" style="height:5px;background:var(--pri,#4CAF50);border-radius:3px;width:0%;transition:width 0.1s;position:absolute;left:0;top:50%;transform:translateY(-50%)"></div>
+            <div id="cust-cheat-markers" style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none"></div>
           </div>
           <input type="range" id="cust-vol" min="0" max="1" step="0.1" value="1" onchange="custSetVol(this.value)" style="width:50px">
           <span style="font-size:11px;color:#fff">🔊</span>
@@ -10351,6 +10407,8 @@ async function openPlayback(examId,studentId,type){
       else if(e.key==='ArrowRight'){ e.preventDefault(); custSkip(5); }
     });
     vid.tabIndex=0; // 让 video 可获得焦点，从而接收 keydown 事件
+    // 自动播放
+    setTimeout(()=>{ document.getElementById('play-all-btn')?.click(); }, 300);
   } catch(e){
     viewer.innerHTML+=`<div class="card-bd"><div style="text-align:center;color:var(--err);padding:20px">加载失败：${e.message}</div></div>`;
   }
@@ -10391,11 +10449,56 @@ async function playAllChunks(type){
   if(status) status.textContent='播放完毕';
 }
 
+function loadCheatForPlayback(sub,examId){
+  let examStartBase=null;
+  const ts=(sub.cheatLog||[]).map(e=>e.t).filter(t=>/\d{1,2}:\d{2}:\d{2}/.test(t));
+  if(ts.length>0){
+    const [h,m,s]=ts.sort()[0].split(':').map(Number);
+    const exam=getExamList().find(e=>String(e.id)===String(examId));
+    let ds='';
+    if(exam?.startTime){const d=new Date(exam.startTime.replace(/\//g,'-'));if(!isNaN(d))ds=d.toISOString().split('T')[0];}
+    if(!ds) ds=new Date().toISOString().split('T')[0];
+    const base=new Date(ds+'T00:00:00');base.setHours(h,m,s-5,0);
+    if(!isNaN(base)) examStartBase=base.getTime();
+  }
+  const markers=[];
+  if(sub.cheatLog&&examStartBase){
+    const sd=new Date(examStartBase);
+    sub.cheatLog.forEach(e=>{
+      const m=e.t.match(/(\d{1,2}):(\d{2}):(\d{2})/);
+      if(m){const ed=new Date(sd);ed.setHours(+m[1],+m[2],+m[3],0);const el=Math.round((ed-sd)/1000);if(el>=0)markers.push({elapsed:el,type:e.type||''});}
+    });
+  }
+  window._playbackCheat={examStartBase,cheatMarkers:markers};
+}
+
+function custUpdateProgress(){
+  const vid=document.getElementById('playback-video');
+  if(!vid||!vid.duration)return;
+  const bar=document.getElementById('cust-progress-bar');
+  if(bar)bar.style.width=((vid.currentTime/vid.duration)*100)+'%';
+  const te=document.getElementById('cust-time');
+  if(te)te.textContent=fmtTime(vid.currentTime)+' / '+fmtTime(vid.duration);
+  const me=document.getElementById('cust-cheat-markers');
+  if(me){
+    const c=window._playbackCheat;
+    if(c&&c.cheatMarkers&&c.cheatMarkers.length>0){
+      let h='';
+      c.cheatMarkers.forEach(m=>{
+        const p=(m.elapsed/vid.duration)*100;
+        if(p>=0&&p<=100)h+='<span title="'+esc(m.type)+'" style="position:absolute;left:'+p+'%;top:0;width:2px;height:100%;background:#ef4444;transform:translateX(-50%)"></span>';
+      });
+      me.innerHTML=h;
+    }
+  }
+}
+
 function closePlayback(){
   const vid=document.getElementById('playback-video');
-  if(vid){ vid.pause(); vid.src=''; }
+  if(vid){vid.pause();vid.src='';}
   document.getElementById('play-viewer').style.display='none';
   window._playbackManifest=null;
+  window._playbackCheat=null;
 }
 
 // 导入本地视频文件（跨网络考生交卷时导出的webm片段）
@@ -10863,6 +10966,9 @@ async function openLocalPlayback(studentId, type, examId){
   const chunks = await getLocalVideoChunks(studentId, type, examId);
   if(chunks.length === 0){ toast('该考生没有'+ (type==='screen'?'录屏':'摄像头') +'片段','warn'); return; }
 
+  // 加载作弊标记数据
+  {const sk=subKey(studentId,examId);const sub=DB.submissions[sk];if(sub)loadCheatForPlayback(sub,examId);}
+
   const viewer = document.getElementById('play-viewer');
   viewer.style.display = 'block';
   // 自定义播放器：无原生controls，使用自定义进度条
@@ -10914,6 +11020,8 @@ async function openLocalPlayback(studentId, type, examId){
     else if(e.key==='ArrowRight'){ e.preventDefault(); custSkip(5); }
   });
   vid.tabIndex = 0; // 让 video 可获得焦点接收键盘事件
+  // 自动播放
+  setTimeout(()=>{ document.getElementById('play-all-btn')?.click(); }, 300);
   viewer.scrollIntoView({behavior:'smooth'});
 }
 
@@ -11069,6 +11177,11 @@ async function playLocalAll(studentId, type){
 // ── 数据导入/导出（支持离线使用）──────────────────────
 function openExportDialog(){
   const exams = getExamList();
+  // 按名称自然排序
+  exams.sort((a,b)=>naturalSort([a.name,b.name])?a.name.localeCompare(b.name):0);
+  // 或直接用 naturalSort 对名称数组排序后映射回 exams
+  const sortedNames = naturalSort(exams.map(e=>e.name));
+  exams.sort((a,b)=>sortedNames.indexOf(a.name)-sortedNames.indexOf(b.name));
   const listEl = document.getElementById('export-exam-list');
   const btnSelected = document.getElementById('btn-export-selected');
   
